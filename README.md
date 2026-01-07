@@ -1,18 +1,29 @@
-# RCPP-Server
 
-## Team Members
-- **Sohel Mamun** – Frontend & Backend coordination
-- **Md. Shukur Mahmud (Sukkur)** – Backend development
-- **Hafiz** – Backend development
-- **Humayun** – Backend development
-- **Zilhaj** – Backend development
+===RCPP-Server===
 
-## Branching Strategy
-- **main** → Production ready
-- **development** → Team integration/testing
-- **personal branches** → Each member has their own branch:
-  - `sohel`
-  - `sukkur`
-  - `hafiz`
-  - `humayun`
-  - `zilhaj`
+Backend server for RCPP project using Node.js, Express, MongoDB,Firebase
+
+Project Overview
+This is the backend repository for RCPP project. It includes:
+
+REST API endpoints
+MongoDB models
+Express server
+Firebase for authentication
+Team Members
+Sohel Mamun – developer
+Md. Shukur Mahmud (Sukkur) – developer
+Hafiz – developer
+Humayun – developer
+Zilhaj – developer
+Branching Strategy
+main → Production ready
+development → Team integration/testing
+personal branches → Each member has their own branch:
+sohel
+sukkur
+hafiz
+humayun
+zilhaj
+Getting Started
+Clone the repo:
