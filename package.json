@@ -1,0 +1,26 @@
+{
+  "name": "rcpp-server",
+  "version": "1.0.0",
+  "description": "RCPP-Server\r │── package.json\r │── index.js   (বা server.js / app.js)\r │── .gitignore",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sohelma/RCPP-Server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sohelma/RCPP-Server/issues"
+  },
+  "homepage": "https://github.com/sohelma/RCPP-Server#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mongodb": "^7.0.0"
+  }
+}
