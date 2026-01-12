@@ -71,7 +71,7 @@ async function run() {
 			res.send(result);
 		});
 
-		// Report incident APIs
+		// Report incident api
 		app.post("/report-incident", async (req, res) => {
 			try {
 				const incidentData = req.body;
