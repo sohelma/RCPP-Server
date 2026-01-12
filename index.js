@@ -59,6 +59,7 @@ async function run() {
     const usersCollection = db.collection("users");
     const reportIncidentCollection = db.collection("reportIncidentColl");
     const helpDeskCollection = db.collection("helpDeskColl");
+    const threatCollection = db.collection("threatAlerts");
 
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -150,6 +151,40 @@ async function run() {
         res.send(requests);
       } catch (error) {
         res.status(500).send({ message: error.message });
+      }
+    });
+
+    // awareness page APIs
+    // Threat-alerts
+    app.post("/threat-alerts", async (req, res) => {
+      try {
+        const threatAlerts = req.body;
+
+        // validate: must be an array
+        if (!Array.isArray(threatAlerts)) {
+          return res.status(400).json({ message: "Data must be an array" });
+        }
+
+        const result = await threatCollection.insertMany(threatAlerts);
+
+        res.status(201).json({
+          message: "Threat alerts inserted successfully",
+          insertedCount: result.insertedCount,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to insert threat alerts" });
+      }
+    });
+
+    app.get("/threat-alerts", async (req, res) => {
+      try {
+        const alerts = await threatCollection.find({}).toArray();
+
+        res.status(200).json(alerts);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch threat alerts" });
       }
     });
 
