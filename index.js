@@ -56,96 +56,78 @@ async function run() {
     const createAuthRoutes = require("./routes/authRoutes");
     app.use("/auth", createAuthRoutes(usersCollection));
 
-    // --- ADMIN DASHBOARD STATS (Optimized) ---
-    app.get("/admin-stats", async (req, res) => {
-      try {
-        const totalReports = await reportIncidentCollection.countDocuments();
-        const pendingReview = await reportIncidentCollection.countDocuments({
-          status: "Pending",
-        });
-        const casesResolved = await reportIncidentCollection.countDocuments({
-          status: "Resolved",
-        });
-        const criticalThreatsCount =
-          await reportIncidentCollection.countDocuments({
-            urgentLevel: "high",
-          }); // Apnar schema onujayi urgentLevel
+// --- ADMIN DASHBOARD STATS (Optimized) ---
+app.get("/admin-stats", async (req, res) => {
+  try {
+    const totalReports = await reportIncidentCollection.countDocuments();
+    const pendingReview = await reportIncidentCollection.countDocuments({ status: "Pending" });
+    const casesResolved = await reportIncidentCollection.countDocuments({ status: "Resolved" });
+    const criticalThreatsCount = await reportIncidentCollection.countDocuments({ urgentLevel: "high" }); // Apnar schema onujayi urgentLevel
 
-        const malwareCount = await reportIncidentCollection.countDocuments({
-          incidentType: "malware",
-        });
-        const phishingCount = await reportIncidentCollection.countDocuments({
-          incidentType: "phishing",
-        });
-        const ddosCount = await reportIncidentCollection.countDocuments({
-          incidentType: "ddos",
-        });
-        const otherCount =
-          totalReports - (malwareCount + phishingCount + ddosCount);
+    const malwareCount = await reportIncidentCollection.countDocuments({ incidentType: "malware" });
+    const phishingCount = await reportIncidentCollection.countDocuments({ incidentType: "phishing" });
+    const ddosCount = await reportIncidentCollection.countDocuments({ incidentType: "ddos" });
+    const otherCount = totalReports - (malwareCount + phishingCount + ddosCount);
 
-        // Recent Critical Alerts fetch kora (Last 5 alerts)
-        const recentAlerts = await reportIncidentCollection
-          .find({ urgentLevel: "high" })
-          .sort({ _id: -1 }) // Newest first
-          .limit(5)
-          .toArray();
+    // Recent Critical Alerts fetch kora (Last 5 alerts)
+    const recentAlerts = await reportIncidentCollection
+      .find({ urgentLevel: "high" })
+      .sort({ _id: -1 }) // Newest first
+      .limit(5)
+      .toArray();
 
-        res.send({
-          success: true,
-          summary: {
-            totalReports,
-            pendingReview,
-            casesResolved,
-            criticalThreats: criticalThreatsCount,
-          },
-          distribution: [
-            { name: "Malware", value: malwareCount },
-            { name: "Phishing", value: phishingCount },
-            { name: "DDoS", value: ddosCount },
-            { name: "Other", value: otherCount > 0 ? otherCount : 0 },
-          ],
-          alerts: recentAlerts.map((alert) => ({
-            id: alert._id,
-            title: alert.title,
-            target: alert.incidentType,
-            timestamp: alert.time || "N/A",
-          })),
-        });
-      } catch (err) {
-        res.status(500).send({ success: false, message: err.message });
-      }
+    res.send({
+      success: true,
+      summary: {
+        totalReports,
+        pendingReview,
+        casesResolved,
+        criticalThreats: criticalThreatsCount
+      },
+      distribution: [
+        { name: "Malware", value: malwareCount },
+        { name: "Phishing", value: phishingCount },
+        { name: "DDoS", value: ddosCount },
+        { name: "Other", value: otherCount > 0 ? otherCount : 0 },
+      ],
+      alerts: recentAlerts.map(alert => ({
+        id: alert._id,
+        title: alert.title,
+        target: alert.incidentType,
+        timestamp: alert.time || "N/A"
+      }))
     });
+  } catch (err) {
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
 
     // ----------------- USERS -----------------
+    // CREATE USER
     app.post("/users", async (req, res) => {
       try {
         const user = req.body;
 
-        // Required fields
         if (!user.password || !user.email || !user.name) {
-          return res.status(400).send({
-            success: false,
-            message: "Name, email and password are required",
+          return res.status(400).send({ 
+            success: false, 
+            message: "Name, email and password are required" 
           });
         }
 
         // Check if user already exists
-        const existingUser = await usersCollection.findOne({
-          email: user.email,
-        });
+        const existingUser = await usersCollection.findOne({ email: user.email });
         if (existingUser) {
           return res
             .status(400)
             .send({ success: false, message: "User already exists" });
         }
 
-        // Hash password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
 
-        // Default fields
         user.role = user.role || "user";
-        user.email_verified = true; // change to false if you want OTP verification
+        user.email_verified = true;
 
         const result = await usersCollection.insertOne(user);
         res.status(201).send({ success: true, data: result });
@@ -154,17 +136,24 @@ async function run() {
       }
     });
 
-    // Get user by email
+    // GET USERS WITH SEARCH + PAGINATION
     app.get("/users", async (req, res) => {
       try {
         const { email } = req.query;
-        if (!email)
-          return res.status(400).send({ message: "Email is required" });
+        if (!email) return res.status(400).send({ message: "Email is required" });
 
-        const user = await usersCollection.findOne({ email });
-        res.send(user);
+        const users = await usersCollection.find(query).skip(skip).limit(pageSize).toArray();
+        const totalUsers = await usersCollection.countDocuments(query);
+        const totalPages = Math.ceil(totalUsers / pageSize);
+
+        res.send({
+          users,
+          totalPages,
+          currentPage: parseInt(page),
+          totalUsers
+        });
       } catch (err) {
-        res.status(500).send({ message: err.message });
+        res.status(500).send({ success: false, message: err.message });
       }
     });
 
