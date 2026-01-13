@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const port = process.env.PORT || 3000;
+const port = process.env.PORT ;
 
 const multer = require("multer");
 const path = require("path");
@@ -366,23 +366,44 @@ async function run() {
       try {
         const featuredItems = req.body;
 
-        // validation
+        // 1️⃣ Validate array
         if (!Array.isArray(featuredItems)) {
           return res.status(400).json({
             message: "Data must be an array",
           });
         }
 
+        if (featuredItems.length === 0) {
+          return res.status(400).json({
+            message: "Array cannot be empty",
+          });
+        }
+
+        // 2️⃣ Optional: basic field validation
+        const isValid = featuredItems.every(
+          (item) => item.type && item.title && item.thumbnail
+        );
+
+        if (!isValid) {
+          return res.status(400).json({
+            message: "Each item must include type, title, and thumbnail",
+          });
+        }
+
+        // 3️⃣ Insert
         const result = await featuredContentCollection.insertMany(
-          featuredItems
+          featuredItems,
+          { ordered: false } // continue even if one fails
         );
 
         res.status(201).json({
           message: "Featured content inserted successfully",
           insertedCount: result.insertedCount,
+          insertedIds: result.insertedIds,
         });
       } catch (error) {
         console.error("INSERT FEATURED ERROR 👉", error);
+
         res.status(500).json({
           message: "Failed to insert featured content",
           error: error.message,
