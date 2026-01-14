@@ -5,6 +5,7 @@ const multer = require("multer");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const { MongoClient, ServerApiVersion } = require("mongodb");
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -116,6 +117,7 @@ async function run() {
     });
 
     // ----------------- USERS -----------------
+    // CREATE USER
     app.post("/users", async (req, res) => {
       try {
         const user = req.body;
@@ -153,17 +155,24 @@ async function run() {
       }
     });
 
-    // Get user by email
+    // GET USERS WITH SEARCH + PAGINATION
     app.get("/users", async (req, res) => {
       try {
         const { email } = req.query;
-        if (!email)
-          return res.status(400).send({ message: "Email is required" });
+        if (!email) return res.status(400).send({ message: "Email is required" });
 
-        const user = await usersCollection.findOne({ email });
-        res.send(user);
+        const users = await usersCollection.find(query).skip(skip).limit(pageSize).toArray();
+        const totalUsers = await usersCollection.countDocuments(query);
+        const totalPages = Math.ceil(totalUsers / pageSize);
+
+        res.send({
+          users,
+          totalPages,
+          currentPage: parseInt(page),
+          totalUsers
+        });
       } catch (err) {
-        res.status(500).send({ message: err.message });
+        res.status(500).send({ success: false, message: err.message });
       }
     });
 
