@@ -4,7 +4,8 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const bcrypt = require("bcryptjs");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+// const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -102,7 +103,9 @@ app.get("/admin-stats", async (req, res) => {
   }
 });
 
-    // ----------------- USERS -----------------
+
+
+// ----------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START -----------------
     // CREATE USER
     app.post("/users", async (req, res) => {
       try {
@@ -136,26 +139,125 @@ app.get("/admin-stats", async (req, res) => {
       }
     });
 
-    // GET USERS WITH SEARCH + PAGINATION
-    app.get("/users", async (req, res) => {
-      try {
-        const { email } = req.query;
-        if (!email) return res.status(400).send({ message: "Email is required" });
+    
+   // GET USERS WITH SEARCH + PAGINATION
+   app.get("/users", async (req, res) => {
+  try {
+    const { q = "", page = 1, limit = 10 } = req.query;
 
-        const users = await usersCollection.find(query).skip(skip).limit(pageSize).toArray();
-        const totalUsers = await usersCollection.countDocuments(query);
-        const totalPages = Math.ceil(totalUsers / pageSize);
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
 
-        res.send({
-          users,
-          totalPages,
-          currentPage: parseInt(page),
-          totalUsers
-        });
-      } catch (err) {
-        res.status(500).send({ success: false, message: err.message });
-      }
+    // Search query
+    const query = q
+      ? {
+          $or: [
+            { name: { $regex: q, $options: "i" } },
+            { email: { $regex: q, $options: "i" } },
+            { phone: { $regex: q, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const users = await usersCollection
+      .find(query)
+      .skip(skip)
+      .limit(pageSize)
+      .toArray();
+
+    const totalUsers = await usersCollection.countDocuments(query);
+    const totalPages = Math.ceil(totalUsers / pageSize);
+
+    res.send({
+      users,
+      totalUsers,
+      totalPages,
+      currentPage: pageNumber,
     });
+  } catch (err) {
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
+     // UPDATE USER (FINAL)
+app.put("/users/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedData = req.body;
+
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          name: updatedData.name,
+          email: updatedData.email,
+          phone: updatedData.phone,
+          role: updatedData.role,
+          status: updatedData.status,
+          division: updatedData.division,
+          district: updatedData.district,
+          upazila: updatedData.upazila,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    res.send({ success: true, result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
+
+ 
+//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------
+
+// ----------------CASES---------------------CASES--------------------CASES--------------------CASES 
+
+// GET CASES WITH SEARCH + PAGINATION
+app.get("/cases", async (req, res) => {
+  try {
+    const { q = "", page = 1, limit = 10 } = req.query;
+
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const query = q
+      ? {
+          $or: [
+            { title: { $regex: q, $options: "i" } },
+            { "contactInfo.fullName": { $regex: q, $options: "i" } },
+            { incidentType: { $regex: q, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const cases = await reportIncidentCollection
+      .find(query)
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .toArray();
+
+    const totalCases = await reportIncidentCollection.countDocuments(query);
+    const totalPages = Math.ceil(totalCases / pageSize);
+
+    res.send({
+      cases,
+      totalCases,
+      totalPages,
+      currentPage: pageNumber,
+    });
+  } catch (err) {
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
+
+// -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
 
     // ----------------- REPORT INCIDENT -----------------
     app.post(
