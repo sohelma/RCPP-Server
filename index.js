@@ -56,6 +56,11 @@ async function run() {
 		const createAuthRoutes = require("./routes/authRoutes");
 		app.use("/auth", createAuthRoutes(usersCollection));
 
+		app.get("/report-incident", async (req, res) => {
+			const result = await reportIncidentCollection.find().toArray();
+			res.send(result);
+		});
+
 		// --- ADMIN DASHBOARD STATS (Optimized) ---
 		app.get("/admin-stats", async (req, res) => {
 			try {
@@ -176,10 +181,8 @@ async function run() {
 		// ----------------- REPORT INCIDENT -----------------
 		app.post("/report-incident", async (req, res) => {
 			try {
-			
 				const bodyData = req.body;
 
-				
 				const generatedTicket = `RCPP-${Date.now().toString().slice(-6)}`;
 
 				const finalData = {
@@ -188,11 +191,10 @@ async function run() {
 					status: "pending",
 					submittedAt: new Date(),
 				};
+				// console.log("Attempting to save:", finalData);
 
-				
 				const result = await reportIncidentCollection.insertOne(finalData);
 
-				
 				if (result.insertedId) {
 					res.status(201).send({
 						success: true,
