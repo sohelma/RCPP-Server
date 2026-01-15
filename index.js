@@ -5,6 +5,7 @@ const multer = require("multer");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const { MongoClient, ServerApiVersion } = require("mongodb");
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -51,9 +52,9 @@ async function run() {
     const reportIncidentCollection = db.collection("reportIncidentColl");
     const helpDeskCollection = db.collection("helpDeskColl");
 
-		// ----------------- AUTH ROUTES -----------------
-		const createAuthRoutes = require("./routes/authRoutes");
-		app.use("/auth", createAuthRoutes(usersCollection));
+    // ----------------- AUTH ROUTES -----------------
+    const createAuthRoutes = require("./routes/authRoutes");
+    app.use("/auth", createAuthRoutes(usersCollection));
 
     // --- ADMIN DASHBOARD STATS (Optimized) ---
     app.get("/admin-stats", async (req, res) => {
@@ -116,6 +117,7 @@ async function run() {
     });
 
     // ----------------- USERS -----------------
+    // CREATE USER
     app.post("/users", async (req, res) => {
       try {
         const user = req.body;
@@ -153,62 +155,70 @@ async function run() {
       }
     });
 
-    // Get user by email
+    // GET USERS WITH SEARCH + PAGINATION
     app.get("/users", async (req, res) => {
       try {
         const { email } = req.query;
         if (!email)
           return res.status(400).send({ message: "Email is required" });
 
-        const user = await usersCollection.findOne({ email });
-        res.send(user);
+        const users = await usersCollection
+          .find(query)
+          .skip(skip)
+          .limit(pageSize)
+          .toArray();
+        const totalUsers = await usersCollection.countDocuments(query);
+        const totalPages = Math.ceil(totalUsers / pageSize);
+
+        res.send({
+          users,
+          totalPages,
+          currentPage: parseInt(page),
+          totalUsers,
+        });
       } catch (err) {
-        res.status(500).send({ message: err.message });
+        res.status(500).send({ success: false, message: err.message });
       }
     });
 
-		// ----------------- REPORT INCIDENT -----------------
-		app.post("/report-incident", async (req, res) => {
-			try {
-			
-				const bodyData = req.body;
+    // ----------------- REPORT INCIDENT -----------------
+    app.post("/report-incident", async (req, res) => {
+      try {
+        const bodyData = req.body;
 
-				
-				const generatedTicket = `RCPP-${Date.now().toString().slice(-6)}`;
+        const generatedTicket = `RCPP-${Date.now().toString().slice(-6)}`;
 
-				const finalData = {
-					...bodyData,
-					ticketNumber: generatedTicket,
-					status: "pending",
-					submittedAt: new Date(),
-				};
+        const finalData = {
+          ...bodyData,
+          ticketNumber: generatedTicket,
+          status: "pending",
+          submittedAt: new Date(),
+        };
 
-				
-				const result = await reportIncidentCollection.insertOne(finalData);
+        const result = await reportIncidentCollection.insertOne(finalData);
 
-				
-				if (result.insertedId) {
-					res.status(201).send({
-						success: true,
-						message: "Incident reported successfully",
-						ticketNumber: generatedTicket,
-					});
-				}
-			} catch (error) {
-				console.error("Database Error:", error);
-				res.status(500).send({
-					success: false,
-					message: "Internal server error",
-				});
-			}
-		});
-		// ----------------- HELP DESK -----------------
-		app.post("/contact-helpdesk", async (req, res) => {
-			try {
-				const {name, email, technicalSupport, description} = req.body;
-				if (!name || !email || !technicalSupport || !description) {
-					return res.status(400).send({message: "All fields are required"});
-				}
+        if (result.insertedId) {
+          res.status(201).send({
+            success: true,
+            message: "Incident reported successfully",
+            ticketNumber: generatedTicket,
+          });
+        }
+      } catch (error) {
+        console.error("Database Error:", error);
+        res.status(500).send({
+          success: false,
+          message: "Internal server error",
+        });
+      }
+    });
+    // ----------------- HELP DESK -----------------
+    app.post("/contact-helpdesk", async (req, res) => {
+      try {
+        const { name, email, technicalSupport, description } = req.body;
+        if (!name || !email || !technicalSupport || !description) {
+          return res.status(400).send({ message: "All fields are required" });
+        }
 
         const helpDeskData = {
           name,
