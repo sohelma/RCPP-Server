@@ -332,45 +332,42 @@ async function run() {
 		// -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
 
 		// ----------------- REPORT INCIDENT -----------------
-		app.post(
-			"/report-incident",
-			upload.array("evidence", 5),
-			async (req, res) => {
-				try {
-					const {
-						incidentType,
-						urgentLevel,
-						title,
-						description,
-						date,
-						time,
-						fullName,
-						email,
-						phone,
-					} = req.body;
-					const incidentData = {
-						incidentType,
-						urgentLevel,
-						title,
-						description,
-						date,
-						time,
-						contactInfo: {fullName, email, phone: phone || null},
-						evidenceFiles:
-							req.files?.map(f => ({
-								fileName: f.filename,
-								filePath: f.path,
-								fileType: f.mimetype,
-							})) || [],
-						createdAt: new Date().toLocaleString(),
-					};
-					const result = await reportIncidentCollection.insertOne(incidentData);
-					res.status(201).send(result);
-				} catch (err) {
-					res.status(500).send({message: err.message});
+		app.post("/report-incident", async (req, res) => {
+			try {
+				const formData = req.body;
+				const ticketNumber = `RCPP-${Math.floor(
+					100000 + Math.random() * 900000
+				)}`;
+
+				const newReport = {
+					...formData,
+					ticketNumber: ticketNumber,
+					status: "pending",
+					submittedAt: new Date(),
+				};
+
+				const result = await reportIncidentCollection.insertOne(newReport);
+
+				if (result.insertedId) {
+					res.status(201).json({
+						success: true,
+						message: "Report submitted successfully",
+						ticketNumber: ticketNumber,
+					});
+				} else {
+					res.status(500).json({
+						success: false,
+						message: "Failed to save report to database",
+					});
 				}
+			} catch (error) {
+				console.error("Submission Error:", error);
+				res.status(500).json({
+					success: false,
+					message: "Internal Server Error",
+				});
 			}
-		);
+		});
 
 		// ----------------- HELP DESK -----------------
 		app.post("/contact-helpdesk", async (req, res) => {
