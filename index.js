@@ -52,9 +52,9 @@ async function run() {
     const reportIncidentCollection = db.collection("reportIncidentColl");
     const helpDeskCollection = db.collection("helpDeskColl");
 
-		// ----------------- AUTH ROUTES -----------------
-		const createAuthRoutes = require("./routes/authRoutes");
-		app.use("/auth", createAuthRoutes(usersCollection));
+    // ----------------- AUTH ROUTES -----------------
+    const createAuthRoutes = require("./routes/authRoutes");
+    app.use("/auth", createAuthRoutes(usersCollection));
 
     // --- ADMIN DASHBOARD STATS (Optimized) ---
     app.get("/admin-stats", async (req, res) => {
@@ -267,7 +267,10 @@ app.get("/cases", async (req, res) => {
   }
 });
 
-    // ----------------- REPORT INCIDENT -----------------
+
+// -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
+
+    // ----------------- REPORT INCIDENT ----------------- // ----------------- REPORT INCIDENT ----------------- // ----------------- REPORT INCIDENT -----------------
     app.post(
       "/report-incident",
       upload.array("evidence", 5),
@@ -308,6 +311,63 @@ app.get("/cases", async (req, res) => {
       }
     );
 
+    
+// UPDATE CASE STATUS
+app.patch("/cases/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["pending", "resolved", "rejected"].includes(status)) {
+      return res.status(400).send({ message: "Invalid status" });
+    }
+
+    const result = await reportIncidentCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          status,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    res.send({ success: true, result });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
+
+    
+// GET SINGLE CASE BY ID (FINAL & CORRECT)
+app.get("/cases/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid case ID" });
+    }
+
+    const singleCase = await reportIncidentCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!singleCase) {
+      return res.status(404).send({ message: "Case not found" });
+    }
+
+    res.send({
+      success: true,
+      data: singleCase,
+    });
+  } catch (err) {
+    console.error("Single case error:", err);
+    res.status(500).send({ message: err.message });
+  }
+});
+
+
+ // ----------------- REPORT INCIDENT ----------------- // ----------------- REPORT INCIDENT ----------------- // ----------------- REPORT INCIDENT -----------------
     // ----------------- HELP DESK -----------------
     app.post("/contact-helpdesk", async (req, res) => {
       try {
