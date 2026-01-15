@@ -4,7 +4,7 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const bcrypt = require("bcryptjs");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -116,37 +116,32 @@ async function run() {
       }
     });
 
-    // ----------------- USERS -----------------
+// ----------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START -----------------
     // CREATE USER
     app.post("/users", async (req, res) => {
       try {
         const user = req.body;
 
-        // Required fields
         if (!user.password || !user.email || !user.name) {
-          return res.status(400).send({
-            success: false,
-            message: "Name, email and password are required",
+          return res.status(400).send({ 
+            success: false, 
+            message: "Name, email and password are required" 
           });
         }
 
         // Check if user already exists
-        const existingUser = await usersCollection.findOne({
-          email: user.email,
-        });
+        const existingUser = await usersCollection.findOne({ email: user.email });
         if (existingUser) {
           return res
             .status(400)
             .send({ success: false, message: "User already exists" });
         }
 
-        // Hash password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
 
-        // Default fields
         user.role = user.role || "user";
-        user.email_verified = true; // change to false if you want OTP verification
+        user.email_verified = true;
 
         const result = await usersCollection.insertOne(user);
         res.status(201).send({ success: true, data: result });
@@ -155,69 +150,171 @@ async function run() {
       }
     });
 
-    // GET USERS WITH SEARCH + PAGINATION
-    app.get("/users", async (req, res) => {
-      try {
-        const { email } = req.query;
-        if (!email) return res.status(400).send({ message: "Email is required" });
+    
+   // GET USERS WITH SEARCH + PAGINATION
+   app.get("/users", async (req, res) => {
+  try {
+    const { q = "", page = 1, limit = 10 } = req.query;
 
-        const users = await usersCollection.find(query).skip(skip).limit(pageSize).toArray();
-        const totalUsers = await usersCollection.countDocuments(query);
-        const totalPages = Math.ceil(totalUsers / pageSize);
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
 
-        res.send({
-          users,
-          totalPages,
-          currentPage: parseInt(page),
-          totalUsers
-        });
-      } catch (err) {
-        res.status(500).send({ success: false, message: err.message });
-      }
+    // Search query
+    const query = q
+      ? {
+          $or: [
+            { name: { $regex: q, $options: "i" } },
+            { email: { $regex: q, $options: "i" } },
+            { phone: { $regex: q, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const users = await usersCollection
+      .find(query)
+      .skip(skip)
+      .limit(pageSize)
+      .toArray();
+
+    const totalUsers = await usersCollection.countDocuments(query);
+    const totalPages = Math.ceil(totalUsers / pageSize);
+
+    res.send({
+      users,
+      totalUsers,
+      totalPages,
+      currentPage: pageNumber,
     });
+  } catch (err) {
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
 
-		// ----------------- REPORT INCIDENT -----------------
-		app.post("/report-incident", async (req, res) => {
-			try {
-			
-				const bodyData = req.body;
+     // UPDATE USER (FINAL)
+app.put("/users/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedData = req.body;
 
-				
-				const generatedTicket = `RCPP-${Date.now().toString().slice(-6)}`;
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          name: updatedData.name,
+          email: updatedData.email,
+          phone: updatedData.phone,
+          role: updatedData.role,
+          status: updatedData.status,
+          division: updatedData.division,
+          district: updatedData.district,
+          upazila: updatedData.upazila,
+          updatedAt: new Date(),
+        },
+      }
+    );
 
-				const finalData = {
-					...bodyData,
-					ticketNumber: generatedTicket,
-					status: "pending",
-					submittedAt: new Date(),
-				};
+    res.send({ success: true, result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
 
-				
-				const result = await reportIncidentCollection.insertOne(finalData);
 
-				
-				if (result.insertedId) {
-					res.status(201).send({
-						success: true,
-						message: "Incident reported successfully",
-						ticketNumber: generatedTicket,
-					});
-				}
-			} catch (error) {
-				console.error("Database Error:", error);
-				res.status(500).send({
-					success: false,
-					message: "Internal server error",
-				});
-			}
-		});
-		// ----------------- HELP DESK -----------------
-		app.post("/contact-helpdesk", async (req, res) => {
-			try {
-				const {name, email, technicalSupport, description} = req.body;
-				if (!name || !email || !technicalSupport || !description) {
-					return res.status(400).send({message: "All fields are required"});
-				}
+ 
+//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------
+
+// ----------------CASES---------------------CASES--------------------CASES--------------------CASES 
+
+// GET CASES WITH SEARCH + PAGINATION
+app.get("/cases", async (req, res) => {
+  try {
+    const { q = "", page = 1, limit = 10 } = req.query;
+
+    const pageNumber = parseInt(page);
+    const pageSize = parseInt(limit);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const query = q
+      ? {
+          $or: [
+            { title: { $regex: q, $options: "i" } },
+            { "contactInfo.fullName": { $regex: q, $options: "i" } },
+            { incidentType: { $regex: q, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const cases = await reportIncidentCollection
+      .find(query)
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .toArray();
+
+    const totalCases = await reportIncidentCollection.countDocuments(query);
+    const totalPages = Math.ceil(totalCases / pageSize);
+
+    res.send({
+      cases,
+      totalCases,
+      totalPages,
+      currentPage: pageNumber,
+    });
+  } catch (err) {
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
+    // ----------------- REPORT INCIDENT -----------------
+    app.post(
+      "/report-incident",
+      upload.array("evidence", 5),
+      async (req, res) => {
+        try {
+          const {
+            incidentType,
+            urgentLevel,
+            title,
+            description,
+            date,
+            time,
+            fullName,
+            email,
+            phone,
+          } = req.body;
+          const incidentData = {
+            incidentType,
+            urgentLevel,
+            title,
+            description,
+            date,
+            time,
+            contactInfo: { fullName, email, phone: phone || null },
+            evidenceFiles:
+              req.files?.map((f) => ({
+                fileName: f.filename,
+                filePath: f.path,
+                fileType: f.mimetype,
+              })) || [],
+            createdAt: new Date().toLocaleString(),
+          };
+          const result = await reportIncidentCollection.insertOne(incidentData);
+          res.status(201).send(result);
+        } catch (err) {
+          res.status(500).send({ message: err.message });
+        }
+      }
+    );
+
+    // ----------------- HELP DESK -----------------
+    app.post("/contact-helpdesk", async (req, res) => {
+      try {
+        const { name, email, technicalSupport, description } = req.body;
+        if (!name || !email || !technicalSupport || !description) {
+          return res.status(400).send({ message: "All fields are required" });
+        }
 
         const helpDeskData = {
           name,
