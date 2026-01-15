@@ -255,6 +255,49 @@ app.get("/cases", async (req, res) => {
     res.status(500).send({ success: false, message: err.message });
   }
 });
+// GET SINGLE CASE DETAILS
+app.get("/cases/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const singleCase = await reportIncidentCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!singleCase) {
+      return res.status(404).send({ success: false, message: "Case not found" });
+    }
+
+    res.send({ success: true, data: singleCase });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
+// ----------------- UPDATE CASE STATUS -----------------
+app.patch("/cases/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["resolved", "rejected"].includes(status)) {
+      return res.status(400).send({ success: false, message: "Invalid status" });
+    }
+
+    const result = await reportIncidentCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status, updatedAt: new Date() } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ success: false, message: "Case not found" });
+    }
+
+    res.send({ success: true, message: "Status updated successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
 
 
 // -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
