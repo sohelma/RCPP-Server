@@ -1,205 +1,108 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const multer = require("multer");
-const path = require("path");
-const bcrypt = require("bcryptjs");
 const { MongoClient, ServerApiVersion } = require("mongodb");
+const nodemailer = require("nodemailer");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 
 // ----------------- MIDDLEWARES -----------------
 app.use(express.json());
 app.use(cors());
 
-// ----------------- FILE UPLOAD -----------------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /pdf|doc|jpg|jpeg|png|txt/;
-  const ext = path.extname(file.originalname).toLowerCase();
-  cb(null, allowedTypes.test(ext));
-};
-
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
-});
-app.use("/uploads", express.static("uploads"));
-
 // ----------------- MONGODB -----------------
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.byopfvf.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
+
 const client = new MongoClient(uri, {
-  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
 });
 
+// ----------------- NODEMAILER -----------------
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS, // Gmail App Password
+  },
+});
+
+// ----------------- MAIN RUN -----------------
 async function run() {
   try {
     await client.connect();
-    console.log("✅ MongoDB connected successfully");
+    console.log("✅ MongoDB connected");
 
     const db = client.db(process.env.DB_NAME);
-    const usersCollection = db.collection("users");
-    const reportIncidentCollection = db.collection("reportIncidentColl");
     const helpDeskCollection = db.collection("helpDeskColl");
 
-    // ----------------- AUTH ROUTES -----------------
-    const createAuthRoutes = require("./routes/authRoutes");
-    app.use("/auth", createAuthRoutes(usersCollection));
-
-// --- ADMIN DASHBOARD STATS (Optimized) ---
-app.get("/admin-stats", async (req, res) => {
-  try {
-    const totalReports = await reportIncidentCollection.countDocuments();
-    const pendingReview = await reportIncidentCollection.countDocuments({ status: "Pending" });
-    const casesResolved = await reportIncidentCollection.countDocuments({ status: "Resolved" });
-    const criticalThreatsCount = await reportIncidentCollection.countDocuments({ urgentLevel: "high" }); // Apnar schema onujayi urgentLevel
-
-    const malwareCount = await reportIncidentCollection.countDocuments({ incidentType: "malware" });
-    const phishingCount = await reportIncidentCollection.countDocuments({ incidentType: "phishing" });
-    const ddosCount = await reportIncidentCollection.countDocuments({ incidentType: "ddos" });
-    const otherCount = totalReports - (malwareCount + phishingCount + ddosCount);
-
-    // Recent Critical Alerts fetch kora (Last 5 alerts)
-    const recentAlerts = await reportIncidentCollection
-      .find({ urgentLevel: "high" })
-      .sort({ _id: -1 }) // Newest first
-      .limit(5)
-      .toArray();
-
-    res.send({
-      success: true,
-      summary: {
-        totalReports,
-        pendingReview,
-        casesResolved,
-        criticalThreats: criticalThreatsCount
-      },
-      distribution: [
-        { name: "Malware", value: malwareCount },
-        { name: "Phishing", value: phishingCount },
-        { name: "DDoS", value: ddosCount },
-        { name: "Other", value: otherCount > 0 ? otherCount : 0 },
-      ],
-      alerts: recentAlerts.map(alert => ({
-        id: alert._id,
-        title: alert.title,
-        target: alert.incidentType,
-        timestamp: alert.time || "N/A"
-      }))
-    });
-  } catch (err) {
-    res.status(500).send({ success: false, message: err.message });
-  }
-});
-
-    // ----------------- USERS -----------------
-    app.post("/users", async (req, res) => {
-      try {
-        const user = req.body;
-
-        // Required fields
-        if (!user.password || !user.email || !user.name) {
-          return res.status(400).send({ 
-            success: false, 
-            message: "Name, email and password are required" 
-          });
-        }
-
-        // Check if user already exists
-        const existingUser = await usersCollection.findOne({ email: user.email });
-        if (existingUser) {
-          return res.status(400).send({ success: false, message: "User already exists" });
-        }
-
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(user.password, salt);
-
-        // Default fields
-        user.role = user.role || "user";
-        user.email_verified = true; // change to false if you want OTP verification
-
-        const result = await usersCollection.insertOne(user);
-        res.status(201).send({ success: true, data: result });
-      } catch (err) {
-        res.status(500).send({ success: false, message: err.message });
-      }
-    });
-
-    // Get user by email
-    app.get("/users", async (req, res) => {
-      try {
-        const { email } = req.query;
-        if (!email) return res.status(400).send({ message: "Email is required" });
-
-        const user = await usersCollection.findOne({ email });
-        res.send(user);
-      } catch (err) {
-        res.status(500).send({ message: err.message });
-      }
-    });
-
-    // ----------------- REPORT INCIDENT -----------------
-    app.post("/report-incident", upload.array("evidence", 5), async (req, res) => {
-      try {
-        const { incidentType, urgentLevel, title, description, date, time, fullName, email, phone } = req.body;
-        const incidentData = {
-          incidentType,
-          urgentLevel,
-          title,
-          description,
-          date,
-          time,
-          contactInfo: { fullName, email, phone: phone || null },
-          evidenceFiles: req.files?.map(f => ({ fileName: f.filename, filePath: f.path, fileType: f.mimetype })) || [],
-          createdAt: new Date().toLocaleString(),
-        };
-        const result = await reportIncidentCollection.insertOne(incidentData);
-        res.status(201).send(result);
-      } catch (err) {
-        res.status(500).send({ message: err.message });
-      }
-    });
-
-    // ----------------- HELP DESK -----------------
+    // ----------------- HELP DESK API -----------------
     app.post("/contact-helpdesk", async (req, res) => {
       try {
         const { name, email, technicalSupport, description } = req.body;
+
         if (!name || !email || !technicalSupport || !description) {
-          return res.status(400).send({ message: "All fields are required" });
+          return res.status(400).json({
+            success: false,
+            message: "All fields are required",
+          });
         }
 
-        const helpDeskData = { name, email, technicalSupport, description, createdAt: new Date().toLocaleString() };
-        const result = await helpDeskCollection.insertOne(helpDeskData);
-        res.status(201).send(result);
-      } catch (err) {
-        res.status(500).send({ message: err.message });
+        const helpDeskData = {
+          name,
+          email,
+          technicalSupport,
+          description,
+          createdAt: new Date(),
+        };
+
+        // 1️⃣ Save to DB
+        await helpDeskCollection.insertOne(helpDeskData);
+
+        // 2️⃣ Send single email (ONLY ONCE)
+        await transporter.sendMail({
+          from: `"RCPP Help Desk" <${process.env.SMTP_USER}>`,
+          to: process.env.SMTP_USER,
+          subject: `New Help Desk Request — ${technicalSupport}`,
+          text: `
+              Name: ${name}
+              Email: ${email}
+              Issue Type: ${technicalSupport}
+              Description:
+              ${description}
+          `,
+        });
+
+        return res.status(201).json({
+          success: true,
+          message: "Request submitted successfully",
+        });
+
+      } catch (error) {
+        console.error("❌ Help desk error:", error);
+        return res.status(500).json({
+          success: false,
+          message: "Server error. Please try again later.",
+        });
       }
     });
 
-    app.get("/contact-helpdesk", async (req, res) => {
-      try {
-        const requests = await helpDeskCollection.find().toArray();
-        res.send(requests);
-      } catch (err) {
-        res.status(500).send({ message: err.message });
-      }
-    });
-
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("❌ Server startup error:", error);
   }
 }
 
+// ----------------- ROOT -----------------
+app.get("/", (req, res) => {
+  res.send("✅ RCPP main server is running");
+});
+
 run();
 
-// ----------------- ROOT -----------------
-app.get("/", (req, res) => res.send("RCPP main server is running"));
-
-app.listen(port, () => console.log(`🚀 RCPP server running on port ${port}`));
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
