@@ -57,63 +57,68 @@ async function run() {
 		const createAuthRoutes = require("./routes/authRoutes");
 		app.use("/auth", createAuthRoutes(usersCollection));
 
-		// --- ADMIN DASHBOARD STATS (Optimized) ---
-		app.get("/admin-stats", async (req, res) => {
-			try {
-				const totalReports = await reportIncidentCollection.countDocuments();
-				const pendingReview = await reportIncidentCollection.countDocuments({
-					status: "Pending",
-				});
-				const casesResolved = await reportIncidentCollection.countDocuments({
-					status: "Resolved",
-				});
-				const criticalThreatsCount =
-					await reportIncidentCollection.countDocuments({urgentLevel: "high"}); // Apnar schema onujayi urgentLevel
+// ADMIN-----------------------------------		// ADMIN-----------------------------------
 
-				const malwareCount = await reportIncidentCollection.countDocuments({
-					incidentType: "malware",
-				});
-				const phishingCount = await reportIncidentCollection.countDocuments({
-					incidentType: "phishing",
-				});
-				const ddosCount = await reportIncidentCollection.countDocuments({
-					incidentType: "ddos",
-				});
-				const otherCount =
-					totalReports - (malwareCount + phishingCount + ddosCount);
+app.get("/admin-stats", async (req, res) => {
+  try {
+    const totalReports = await reportIncidentCollection.countDocuments();
 
-				// Recent Critical Alerts fetch kora (Last 5 alerts)
-				const recentAlerts = await reportIncidentCollection
-					.find({urgentLevel: "high"})
-					.sort({_id: -1}) // Newest first
-					.limit(5)
-					.toArray();
+    const pendingReview = await reportIncidentCollection.countDocuments({
+      status: "pending",
+    });
 
-				res.send({
-					success: true,
-					summary: {
-						totalReports,
-						pendingReview,
-						casesResolved,
-						criticalThreats: criticalThreatsCount,
-					},
-					distribution: [
-						{name: "Malware", value: malwareCount},
-						{name: "Phishing", value: phishingCount},
-						{name: "DDoS", value: ddosCount},
-						{name: "Other", value: otherCount > 0 ? otherCount : 0},
-					],
-					alerts: recentAlerts.map(alert => ({
-						id: alert._id,
-						title: alert.title,
-						target: alert.incidentType,
-						timestamp: alert.time || "N/A",
-					})),
-				});
-			} catch (err) {
-				res.status(500).send({success: false, message: err.message});
-			}
-		});
+    const casesResolved = await reportIncidentCollection.countDocuments({
+      status: "resolved",
+    });
+
+    const rejectedCases = await reportIncidentCollection.countDocuments({
+      status: "rejected",
+    });
+
+    const criticalThreats = await reportIncidentCollection.countDocuments({
+      urgency: "high",
+    });
+
+    // Threat distribution (example by incidentType)
+    const distribution = await reportIncidentCollection.aggregate([
+      {
+        $group: {
+          _id: "$incidentType",
+          value: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          name: "$_id",
+          value: 1,
+          _id: 0,
+        },
+      },
+    ]).toArray();
+
+    res.send({
+      success: true,
+      summary: {
+        totalReports,
+        pendingReview,
+        casesResolved,
+        rejectedCases,
+        criticalThreats,
+      },
+      distribution,
+    });
+  } catch (err) {
+    res.status(500).send({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+
+
+		// ADMIN-----------------------------------		// ADMIN-----------------------------------
+
 
 		// ----------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START -----------------
 		// ********* SEARCH REPORT *********
