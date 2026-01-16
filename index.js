@@ -1,8 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
-const nodemailer = require("nodemailer");
+const multer = require("multer");
+const path = require("path");
+const bcrypt = require("bcryptjs");
+// const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -11,21 +14,32 @@ const port = process.env.PORT || 5000;
 app.use(express.json());
 app.use(cors());
 
+// ----------------- FILE UPLOAD -----------------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /pdf|doc|jpg|jpeg|png|txt/;
+  const ext = path.extname(file.originalname).toLowerCase();
+  cb(null, allowedTypes.test(ext));
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+});
+app.use("/uploads", express.static("uploads"));
+
 // ----------------- MONGODB -----------------
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.byopfvf.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
 });
 
-async function run() {
-  try {
-    await client.connect();
-    console.log("✅ MongoDB connected successfully");
-
-    const db = client.db(process.env.DB_NAME);
-    const helpDeskCollection = db.collection("helpDeskColl");
-
- // ----------------- Nodemailer -----------------
+// ----------------- NODEMAILER -----------------
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -34,24 +48,16 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// ----------------- MAIN RUN -----------------
+async function run() {
+  try {
+    await client.connect();
+    console.log("✅ MongoDB connected");
 
-    // ---------- TEST MAIL ----------
-    app.get("/test-mail", async (req, res) => {
-      try {
-        await transporter.sendMail({
-          from: `"Test Mail" <${process.env.SMTP_USER}>`,
-          to: process.env.SMTP_USER,
-          subject: "Test Email",
-          text: "If you received this mail, nodemailer works!",
-        });
-        res.send("✅ Test mail sent successfully");
-      } catch (err) {
-        console.error(err);
-        res.status(500).send(err.message);
-      }
-    });
+    const db = client.db(process.env.DB_NAME);
+    const helpDeskCollection = db.collection("helpDeskColl");
 
-    // ----------------- HELP DESK -----------------
+    // ----------------- HELP DESK API -----------------
     app.post("/contact-helpdesk", async (req, res) => {
       try {
         const { name, email, technicalSupport, description } = req.body;
@@ -67,28 +73,34 @@ const transporter = nodemailer.createTransport({
           createdAt: new Date().toLocaleString(),
         };
 
-        const result = await helpDeskCollection.insertOne(helpDeskData);
+        // 1️⃣ Save to DB
+        await helpDeskCollection.insertOne(helpDeskData);
 
+        // 2️⃣ Send single email (ONLY ONCE)
         await transporter.sendMail({
-          from: `"Help Desk" <${process.env.SMTP_USER}>`,
-          to: "sohelma.us@gmail.com",
-          subject: `New Help Desk Request from ${name}`,
+          from: `"RCPP Help Desk" <${process.env.SMTP_USER}>`,
+          to: process.env.SMTP_USER,
+          subject: `New Help Desk Request — ${technicalSupport}`,
           text: `
-            Name: ${name}
-            Email: ${email}
-            Type: ${technicalSupport}
-            Description: ${description}
-            Submitted At: ${helpDeskData.createdAt}
+              Name: ${name}
+              Email: ${email}
+              Issue Type: ${technicalSupport}
+              Description:
+              ${description}
           `,
         });
 
-        res.status(201).send({
+        return res.status(201).json({
           success: true,
-          message: "Request submitted and email sent to support team.",
-          data: result,
+          message: "Request submitted successfully",
         });
-      } catch (err) {
-        res.status(500).send({ message: err.message });
+
+      } catch (error) {
+        console.error("❌ Help desk error:", error);
+        return res.status(500).json({
+          success: false,
+          message: "Server error. Please try again later.",
+        });
       }
     });
   } catch (err) {
@@ -96,9 +108,15 @@ const transporter = nodemailer.createTransport({
   }
 }
 
+run();
+
 // ----------------- ROOT -----------------
-app.get("/", (req, res) => res.send("RCPP main server is running"));
+app.get("/", (req, res) => {
+  res.send("✅ RCPP main server is running");
+});
 
 run();
 
-app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
