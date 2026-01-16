@@ -9,6 +9,7 @@ const {MongoClient, ServerApiVersion, ObjectId} = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 5000;
+app.use("/uploads", express.static("uploads"));
 
 // ----------------- MIDDLEWARES -----------------
 app.use(express.json());
@@ -335,6 +336,17 @@ app.get("/admin-stats", async (req, res) => {
 		});
 
 		// -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
+
+// PROFILE-------------------		// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
+// UPDATE PROFILE WITH IMAGE
+app.use("/uploads", express.static("uploads"));
+
+app.locals.usersCollection = usersCollection;
+
+const profileRoutes = require("./routes/userProfileRoutes");
+app.use(profileRoutes);
+
+// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
 
 		// ----------------- REPORT INCIDENT -----------------
 		app.post("/report-incident", async (req, res) => {
