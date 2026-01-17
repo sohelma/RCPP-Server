@@ -10,6 +10,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 5000;
+let helpDeskChatCollection; 
 
 // ----------------- MIDDLEWARES -----------------
 app.use(express.json());
@@ -53,7 +54,8 @@ async function run() {
     const usersCollection = db.collection("users");
     const reportIncidentCollection = db.collection("reportIncidentColl");
     const helpDeskCollection = db.collection("helpDeskColl");
-
+    helpDeskChatCollection = db.collection("helpDeskChat"); // chat collection assign
+    
     // ----------------- AUTH ROUTES -----------------
     const createAuthRoutes = require("./routes/authRoutes");
     app.use("/auth", createAuthRoutes(usersCollection));
