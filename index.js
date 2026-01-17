@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const port = process.env.PORT ;
+const port = process.env.PORT;
 
 const multer = require("multer");
 const path = require("path");
@@ -121,7 +121,7 @@ async function run() {
         } catch (error) {
           res.status(500).send({ message: error.message });
         }
-      }
+      },
     );
 
     //Contact help-desk APIs
@@ -285,9 +285,9 @@ async function run() {
         const video = req.body;
 
         // Validate: must be an object with a title
-        if (!video || !video.title) {
+        if (!video || (!video.title_en && !video.title_bn)) {
           return res.status(400).json({
-            message: "Video data is required with a title",
+            message: "Video title is required (title_en or title_bn)",
           });
         }
 
@@ -379,21 +379,30 @@ async function run() {
           });
         }
 
-        // 2️⃣ Optional: basic field validation
+        // 2️⃣ Validate required fields
         const isValid = featuredItems.every(
-          (item) => item.type && item.title && item.thumbnail
+          (item) =>
+            item.type &&
+            item.thumbnail &&
+            item.title_en &&
+            item.title_bn &&
+            item.description_en &&
+            item.description_bn,
         );
 
         if (!isValid) {
           return res.status(400).json({
-            message: "Each item must include type, title, and thumbnail",
+            message:
+              "Each item must include type, thumbnail, title_en, title_bn, description_en, description_bn",
           });
         }
 
         // 3️⃣ Insert
         const result = await featuredContentCollection.insertMany(
           featuredItems,
-          { ordered: false } // continue even if one fails
+          {
+            ordered: false,
+          },
         );
 
         res.status(201).json({
@@ -428,7 +437,7 @@ async function run() {
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
+      "Pinged your deployment. You successfully connected to MongoDB!",
     );
   } finally {
     // Ensures that the client will close when you finish/error
