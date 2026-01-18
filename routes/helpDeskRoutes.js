@@ -10,11 +10,20 @@ const createHelpDeskRoutes = (helpDeskCollection) => {
     service: "gmail",
     auth: {
       user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      pass: process.env.SMTP_PASS, // Gmail App Password
     },
   });
 
-  /* ============ CREATE MESSAGE ============ */
+  // ✅ Verify mail server on startup
+  transporter.verify((err) => {
+    if (err) {
+      console.error("❌ Mail server error:", err);
+    } else {
+      console.log("✅ Mail server is ready");
+    }
+  });
+
+  /* ============ CREATE HELP DESK MESSAGE ============ */
   router.post("/contact-helpdesk", async (req, res) => {
     try {
       const { name, email, technicalSupport, description } = req.body;
@@ -35,47 +44,60 @@ const createHelpDeskRoutes = (helpDeskCollection) => {
         createdAt: new Date(),
       };
 
+      // 1️⃣ Save to MongoDB
       await helpDeskCollection.insertOne(helpDeskData);
 
-    await transporter.sendMail({
-  from: `"RCPP Help Desk" <${process.env.SMTP_USER}>`,
-  to: "support@rcpp.gov.bd",
-  replyTo: email, // 🔥 user er email e reply kora jabe
-  subject: `🆘 Help Desk Request | ${technicalSupport}`,
-  html: `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2 style="color:#16a34a;">📩 New Help Desk Request</h2>
-      <hr />
+      // 2️⃣ Send Mail (HTML + Text fallback)
+      await transporter.sendMail({
+        from: `"RCPP Help Desk" <${process.env.SMTP_USER}>`,
+        to: "support@rcpp.gov.bd",
+        replyTo: email,
+        subject: `🆘 Help Desk Request | ${technicalSupport}`,
+        text: `
+Name: ${name}
+Email: ${email}
+Issue Type: ${technicalSupport}
 
-      <p><b>Name:</b> ${name}</p>
-      <p><b>Email:</b> ${email}</p>
-      <p><b>Category:</b> ${technicalSupport}</p>
+Description:
+${description}
+        `,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height:1.6;">
+            <h2 style="color:#16a34a;">📩 New Help Desk Request</h2>
+            <hr/>
 
-      <h4>Description</h4>
-      <p style="background:#f1f5f9; padding:12px; border-radius:8px;">
-        ${description}
-      </p>
+            <p><b>Name:</b> ${name}</p>
+            <p><b>Email:</b> ${email}</p>
+            <p><b>Category:</b> ${technicalSupport}</p>
 
-      <hr />
-      <p style="font-size:12px; color:#64748b;">
-        Sent from RCPP Help Desk System<br/>
-        ${new Date().toLocaleString()}
-      </p>
-    </div>
-  `,
-});
+            <h4>Description</h4>
+            <p style="background:#f1f5f9; padding:12px; border-radius:8px;">
+              ${description}
+            </p>
 
+            <hr/>
+            <p style="font-size:12px; color:#64748b;">
+              Sent from RCPP Help Desk System<br/>
+              ${new Date().toLocaleString()}
+            </p>
+          </div>
+        `,
+      });
 
       res.status(201).send({
         success: true,
-        message: "Message sent successfully",
+        message: "Request submitted & email sent successfully",
       });
     } catch (err) {
-      res.status(500).send({ success: false, message: err.message });
+      console.error("❌ Help Desk Error:", err);
+      res.status(500).send({
+        success: false,
+        message: "Help desk request failed",
+      });
     }
   });
 
-  /* ============ GET ALL ============ */
+  /* ============ GET ALL MESSAGES (ADMIN) ============ */
   router.get("/contact-helpdesk", async (req, res) => {
     const data = await helpDeskCollection
       .find()
@@ -85,7 +107,7 @@ const createHelpDeskRoutes = (helpDeskCollection) => {
     res.send(data);
   });
 
-  /* ============ GET SINGLE ============ */
+  /* ============ GET SINGLE MESSAGE ============ */
   router.get("/contact-helpdesk/:id", async (req, res) => {
     const data = await helpDeskCollection.findOne({
       _id: new ObjectId(req.params.id),
