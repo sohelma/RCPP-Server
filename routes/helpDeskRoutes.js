@@ -37,18 +37,34 @@ const createHelpDeskRoutes = (helpDeskCollection) => {
 
       await helpDeskCollection.insertOne(helpDeskData);
 
-      await transporter.sendMail({
-        from: `"RCPP Help Desk" <${process.env.EMAIL_USER}>`,
-        to: "support@rcpp.gov.bd",
-        subject: `Help Desk Request: ${technicalSupport}`,
-        html: `
-          <h3>New Help Desk Message</h3>
-          <p><b>Name:</b> ${name}</p>
-          <p><b>Email:</b> ${email}</p>
-          <p><b>Issue:</b> ${technicalSupport}</p>
-          <p>${description}</p>
-        `,
-      });
+    await transporter.sendMail({
+  from: `"RCPP Help Desk" <${process.env.SMTP_USER}>`,
+  to: "support@rcpp.gov.bd",
+  replyTo: email, // 🔥 user er email e reply kora jabe
+  subject: `🆘 Help Desk Request | ${technicalSupport}`,
+  html: `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2 style="color:#16a34a;">📩 New Help Desk Request</h2>
+      <hr />
+
+      <p><b>Name:</b> ${name}</p>
+      <p><b>Email:</b> ${email}</p>
+      <p><b>Category:</b> ${technicalSupport}</p>
+
+      <h4>Description</h4>
+      <p style="background:#f1f5f9; padding:12px; border-radius:8px;">
+        ${description}
+      </p>
+
+      <hr />
+      <p style="font-size:12px; color:#64748b;">
+        Sent from RCPP Help Desk System<br/>
+        ${new Date().toLocaleString()}
+      </p>
+    </div>
+  `,
+});
+
 
       res.status(201).send({
         success: true,
