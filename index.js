@@ -5,7 +5,7 @@ const multer = require("multer");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 // const { MongoClient, ServerApiVersion } = require("mongodb");
-const {MongoClient, ServerApiVersion, ObjectId} = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -30,7 +30,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
 	storage,
 	fileFilter,
-	limits: {fileSize: 5 * 1024 * 1024}, // 5 MB
+	limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
 });
 app.use("/uploads", express.static("uploads"));
 
@@ -57,64 +57,68 @@ async function run() {
 		// ----------------- AUTH ROUTES -----------------
 		const createAuthRoutes = require("./routes/authRoutes");
 		app.use("/auth", createAuthRoutes(usersCollection));
+		/* ================= HELP DESK ================= */
+		const createHelpDeskRoutes = require("./routes/helpDeskRoutes");
+		app.use("/api", createHelpDeskRoutes(helpDeskCollection));
 
-// ADMIN-----------------------------------		// ADMIN-----------------------------------
 
-app.get("/admin-stats", async (req, res) => {
-  try {
-    const totalReports = await reportIncidentCollection.countDocuments();
+		// ADMIN-----------------------------------		// ADMIN-----------------------------------
 
-    const pendingReview = await reportIncidentCollection.countDocuments({
-      status: "pending",
-    });
+		app.get("/admin-stats", async (req, res) => {
+			try {
+				const totalReports = await reportIncidentCollection.countDocuments();
 
-    const casesResolved = await reportIncidentCollection.countDocuments({
-      status: "resolved",
-    });
+				const pendingReview = await reportIncidentCollection.countDocuments({
+					status: "pending",
+				});
 
-    const rejectedCases = await reportIncidentCollection.countDocuments({
-      status: "rejected",
-    });
+				const casesResolved = await reportIncidentCollection.countDocuments({
+					status: "resolved",
+				});
 
-    const criticalThreats = await reportIncidentCollection.countDocuments({
-      urgency: "high",
-    });
+				const rejectedCases = await reportIncidentCollection.countDocuments({
+					status: "rejected",
+				});
 
-    // Threat distribution (example by incidentType)
-    const distribution = await reportIncidentCollection.aggregate([
-      {
-        $group: {
-          _id: "$incidentType",
-          value: { $sum: 1 },
-        },
-      },
-      {
-        $project: {
-          name: "$_id",
-          value: 1,
-          _id: 0,
-        },
-      },
-    ]).toArray();
+				const criticalThreats = await reportIncidentCollection.countDocuments({
+					urgency: "high",
+				});
 
-    res.send({
-      success: true,
-      summary: {
-        totalReports,
-        pendingReview,
-        casesResolved,
-        rejectedCases,
-        criticalThreats,
-      },
-      distribution,
-    });
-  } catch (err) {
-    res.status(500).send({
-      success: false,
-      message: err.message,
-    });
-  }
-});
+				// Threat distribution (example by incidentType)
+				const distribution = await reportIncidentCollection.aggregate([
+					{
+						$group: {
+							_id: "$incidentType",
+							value: { $sum: 1 },
+						},
+					},
+					{
+						$project: {
+							name: "$_id",
+							value: 1,
+							_id: 0,
+						},
+					},
+				]).toArray();
+
+				res.send({
+					success: true,
+					summary: {
+						totalReports,
+						pendingReview,
+						casesResolved,
+						rejectedCases,
+						criticalThreats,
+					},
+					distribution,
+				});
+			} catch (err) {
+				res.status(500).send({
+					success: false,
+					message: err.message,
+				});
+			}
+		});
 
 
 
@@ -132,10 +136,10 @@ app.get("/admin-stats", async (req, res) => {
 				if (result) {
 					res.send(result);
 				} else {
-					res.status(404).json({message: "Ticket Not Found"});
+					res.status(404).json({ message: "Ticket Not Found" });
 				}
 			} catch (error) {
-				res.status(500).json({message: "Internal Server Problem"});
+				res.status(500).json({ message: "Internal Server Problem" });
 			}
 		});
 		// CREATE USER
@@ -151,11 +155,11 @@ app.get("/admin-stats", async (req, res) => {
 				}
 
 				// Check if user already exists
-				const existingUser = await usersCollection.findOne({email: user.email});
+				const existingUser = await usersCollection.findOne({ email: user.email });
 				if (existingUser) {
 					return res
 						.status(400)
-						.send({success: false, message: "User already exists"});
+						.send({ success: false, message: "User already exists" });
 				}
 
 				const salt = await bcrypt.genSalt(10);
@@ -165,16 +169,16 @@ app.get("/admin-stats", async (req, res) => {
 				user.email_verified = true;
 
 				const result = await usersCollection.insertOne(user);
-				res.status(201).send({success: true, data: result});
+				res.status(201).send({ success: true, data: result });
 			} catch (err) {
-				res.status(500).send({success: false, message: err.message});
+				res.status(500).send({ success: false, message: err.message });
 			}
 		});
 
 		// GET USERS WITH SEARCH + PAGINATION
 		app.get("/users", async (req, res) => {
 			try {
-				const {q = "", page = 1, limit = 10} = req.query;
+				const { q = "", page = 1, limit = 10 } = req.query;
 
 				const pageNumber = parseInt(page);
 				const pageSize = parseInt(limit);
@@ -183,12 +187,12 @@ app.get("/admin-stats", async (req, res) => {
 				// Search query
 				const query = q
 					? {
-							$or: [
-								{name: {$regex: q, $options: "i"}},
-								{email: {$regex: q, $options: "i"}},
-								{phone: {$regex: q, $options: "i"}},
-							],
-					  }
+						$or: [
+							{ name: { $regex: q, $options: "i" } },
+							{ email: { $regex: q, $options: "i" } },
+							{ phone: { $regex: q, $options: "i" } },
+						],
+					}
 					: {};
 
 				const users = await usersCollection
@@ -207,18 +211,18 @@ app.get("/admin-stats", async (req, res) => {
 					currentPage: pageNumber,
 				});
 			} catch (err) {
-				res.status(500).send({success: false, message: err.message});
+				res.status(500).send({ success: false, message: err.message });
 			}
 		});
 
 		// UPDATE USER (FINAL)
 		app.put("/users/:id", async (req, res) => {
 			try {
-				const {id} = req.params;
+				const { id } = req.params;
 				const updatedData = req.body;
 
 				const result = await usersCollection.updateOne(
-					{_id: new ObjectId(id)},
+					{ _id: new ObjectId(id) },
 					{
 						$set: {
 							name: updatedData.name,
@@ -234,10 +238,10 @@ app.get("/admin-stats", async (req, res) => {
 					}
 				);
 
-				res.send({success: true, result});
+				res.send({ success: true, result });
 			} catch (err) {
 				console.error(err);
-				res.status(500).send({success: false, message: err.message});
+				res.status(500).send({ success: false, message: err.message });
 			}
 		});
 
@@ -248,7 +252,7 @@ app.get("/admin-stats", async (req, res) => {
 		// GET CASES WITH SEARCH + PAGINATION
 		app.get("/cases", async (req, res) => {
 			try {
-				const {q = "", page = 1, limit = 10} = req.query;
+				const { q = "", page = 1, limit = 10 } = req.query;
 
 				const pageNumber = parseInt(page);
 				const pageSize = parseInt(limit);
@@ -256,17 +260,17 @@ app.get("/admin-stats", async (req, res) => {
 
 				const query = q
 					? {
-							$or: [
-								{title: {$regex: q, $options: "i"}},
-								{"contactInfo.fullName": {$regex: q, $options: "i"}},
-								{incidentType: {$regex: q, $options: "i"}},
-							],
-					  }
+						$or: [
+							{ title: { $regex: q, $options: "i" } },
+							{ "contactInfo.fullName": { $regex: q, $options: "i" } },
+							{ incidentType: { $regex: q, $options: "i" } },
+						],
+					}
 					: {};
 
 				const cases = await reportIncidentCollection
 					.find(query)
-					.sort({_id: -1})
+					.sort({ _id: -1 })
 					.skip(skip)
 					.limit(pageSize)
 					.toArray();
@@ -281,13 +285,13 @@ app.get("/admin-stats", async (req, res) => {
 					currentPage: pageNumber,
 				});
 			} catch (err) {
-				res.status(500).send({success: false, message: err.message});
+				res.status(500).send({ success: false, message: err.message });
 			}
 		});
 		// GET SINGLE CASE DETAILS
 		app.get("/cases/:id", async (req, res) => {
 			try {
-				const {id} = req.params;
+				const { id } = req.params;
 				const singleCase = await reportIncidentCollection.findOne({
 					_id: new ObjectId(id),
 				});
@@ -295,58 +299,58 @@ app.get("/admin-stats", async (req, res) => {
 				if (!singleCase) {
 					return res
 						.status(404)
-						.send({success: false, message: "Case not found"});
+						.send({ success: false, message: "Case not found" });
 				}
 
-				res.send({success: true, data: singleCase});
+				res.send({ success: true, data: singleCase });
 			} catch (err) {
 				console.error(err);
-				res.status(500).send({success: false, message: err.message});
+				res.status(500).send({ success: false, message: err.message });
 			}
 		});
 
 		// ----------------- UPDATE CASE STATUS -----------------
 		app.patch("/cases/:id/status", async (req, res) => {
 			try {
-				const {id} = req.params;
-				const {status} = req.body;
+				const { id } = req.params;
+				const { status } = req.body;
 
 				if (!["resolved", "rejected"].includes(status)) {
 					return res
 						.status(400)
-						.send({success: false, message: "Invalid status"});
+						.send({ success: false, message: "Invalid status" });
 				}
 
 				const result = await reportIncidentCollection.updateOne(
-					{_id: new ObjectId(id)},
-					{$set: {status, updatedAt: new Date()}}
+					{ _id: new ObjectId(id) },
+					{ $set: { status, updatedAt: new Date() } }
 				);
 
 				if (result.matchedCount === 0) {
 					return res
 						.status(404)
-						.send({success: false, message: "Case not found"});
+						.send({ success: false, message: "Case not found" });
 				}
 
-				res.send({success: true, message: "Status updated successfully"});
+				res.send({ success: true, message: "Status updated successfully" });
 			} catch (err) {
 				console.error(err);
-				res.status(500).send({success: false, message: err.message});
+				res.status(500).send({ success: false, message: err.message });
 			}
 		});
 
 		// -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
 
-// PROFILE-------------------		// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
-// UPDATE PROFILE WITH IMAGE
-app.use("/uploads", express.static("uploads"));
+		// PROFILE-------------------		// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
+		// UPDATE PROFILE WITH IMAGE
+		app.use("/uploads", express.static("uploads"));
 
-app.locals.usersCollection = usersCollection;
+		app.locals.usersCollection = usersCollection;
 
-const profileRoutes = require("./routes/userProfileRoutes");
-app.use(profileRoutes);
+		const profileRoutes = require("./routes/userProfileRoutes");
+		app.use(profileRoutes);
 
-// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
+		// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
 
 		// ----------------- REPORT INCIDENT -----------------
 		app.post("/report-incident", async (req, res) => {
@@ -387,35 +391,7 @@ app.use(profileRoutes);
 		});
 
 		// ----------------- HELP DESK -----------------
-		app.post("/contact-helpdesk", async (req, res) => {
-			try {
-				const {name, email, technicalSupport, description} = req.body;
-				if (!name || !email || !technicalSupport || !description) {
-					return res.status(400).send({message: "All fields are required"});
-				}
 
-				const helpDeskData = {
-					name,
-					email,
-					technicalSupport,
-					description,
-					createdAt: new Date().toLocaleString(),
-				};
-				const result = await helpDeskCollection.insertOne(helpDeskData);
-				res.status(201).send(result);
-			} catch (err) {
-				res.status(500).send({message: err.message});
-			}
-		});
-
-		app.get("/contact-helpdesk", async (req, res) => {
-			try {
-				const requests = await helpDeskCollection.find().toArray();
-				res.send(requests);
-			} catch (err) {
-				res.status(500).send({message: err.message});
-			}
-		});
 	} catch (err) {
 		console.error(err);
 	}

@@ -1,57 +1,116 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs"); // ১. এটি যোগ করুন
+const bcrypt = require("bcryptjs");
 
 const createAuthRoutes = (usersCollection) => {
   const router = express.Router();
 
-  // Login route
-  // Login route inside createAuthRoutes
-router.post("/user/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await usersCollection.findOne({ email });
+  /* =========================
+     LOGIN
+  ========================== */
+  router.post("/user/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
 
-    if (!user) {
-      return res.status(404).send({ success: false, message: "User not found" });
-    }
+      if (!email || !password) {
+        return res.status(400).send({
+          success: false,
+          message: "Email and password are required",
+        });
+      }
 
-    // ✅ নির্দিষ্ট ৪টি রোল চেক করা হচ্ছে
-    const allowedRoles = ["Super Admin", "Admin", "District Admin", "Sub-District Admin"];
-    if (!allowedRoles.includes(user.role)) {
-      return res.status(403).send({ 
-        success: false, 
-        message: "Access Denied: You do not have permission to access the dashboard." 
+      const user = await usersCollection.findOne({ email });
+
+      if (!user) {
+        return res.status(404).send({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // ✅ Password check
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(401).send({
+          success: false,
+          message: "Invalid password",
+        });
+      }
+
+      // ✅ Role check (dashboard access)
+      const allowedRoles = [
+        "Super Admin",
+        "Admin",
+        "District Admin",
+        "Sub-District Admin",
+        "user",
+      ];
+
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).send({
+          success: false,
+          message: "Access denied",
+        });
+      }
+
+      // ✅ JWT
+      const token = jwt.sign(
+        {
+          id: user._id,
+          email: user.email,
+          role: user.role,
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        { expiresIn: "1d" }
+      );
+
+      // ✅ IMPORTANT: name এখানে পাঠানো হচ্ছে
+      res.send({
+        success: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,          // 🔥 Dashboard header এ এটা লাগবে
+          email: user.email,
+          role: user.role,
+          phone: user.phone || "",
+          profileImage: user.profileImage || "",
+        },
+      });
+    } catch (err) {
+      res.status(500).send({
+        success: false,
+        message: err.message,
       });
     }
+  });
 
-    // পাসওয়ার্ড চেক
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).send({ success: false, message: "Password is incorrect" });
+  /* =========================
+     GET LOGGED IN USER (OPTIONAL BUT RECOMMENDED)
+  ========================== */
+  router.get("/me", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).send({ message: "No token provided" });
+      }
+
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(
+        token,
+        process.env.ACCESS_TOKEN_SECRET
+      );
+
+      const user = await usersCollection.findOne(
+        { _id: new require("mongodb").ObjectId(decoded.id) },
+        { projection: { password: 0 } }
+      );
+
+      res.send({ success: true, user });
+    } catch (err) {
+      res.status(401).send({ message: "Invalid token" });
     }
-
-    const token = jwt.sign(
-      { email: user.email, role: user.role },
-      process.env.ACCESS_TOKEN_SECRET || "secret",
-      { expiresIn: "1d" }
-    );
-
-    res.send({
-      success: true,
-      token,
-      user: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        category: user.category || "user",
-        email_verified: user.email_verified ?? true,
-      },
-    });
-  } catch (err) {
-    res.status(500).send({ success: false, message: "Server error" });
-  }
-});
+  });
 
   return router;
 };
