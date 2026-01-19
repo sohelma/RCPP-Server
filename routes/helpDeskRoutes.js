@@ -47,8 +47,9 @@ module.exports = function (helpDeskCollection) {
       // 2️⃣ Send Email
       await transporter.sendMail({
         from: `"RCPP Help Desk" <${process.env.SMTP_USER}>`,
-        to: "sohelma.us@gmail.com",
-        subject: `Help Desk Request: ${technicalSupport}`,
+        to: "support@rcpp.gov.bd",
+        replyTo: email,
+        subject: `🆘 Help Desk Request | ${technicalSupport}`,
         text: `
           Name: ${name}
           Email: ${email}
