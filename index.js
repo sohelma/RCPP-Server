@@ -13,391 +13,389 @@ app.use("/uploads", express.static("uploads"));
 
 // ----------------- MIDDLEWARES -----------------
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: "http://localhost:3000" }));
 
 // ----------------- FILE UPLOAD -----------------
 const storage = multer.diskStorage({
-	destination: (req, file, cb) => cb(null, "uploads/"),
-	filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 
 const fileFilter = (req, file, cb) => {
-	const allowedTypes = /pdf|doc|jpg|jpeg|png|txt/;
-	const ext = path.extname(file.originalname).toLowerCase();
-	cb(null, allowedTypes.test(ext));
+  const allowedTypes = /pdf|doc|jpg|jpeg|png|txt/;
+  const ext = path.extname(file.originalname).toLowerCase();
+  cb(null, allowedTypes.test(ext));
 };
 
 const upload = multer({
-	storage,
-	fileFilter,
-	limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
 });
 app.use("/uploads", express.static("uploads"));
 
 // ----------------- MONGODB -----------------
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.byopfvf.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
-	serverApi: {
-		version: ServerApiVersion.v1,
-		strict: true,
-		deprecationErrors: true,
-	},
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
 });
 
 async function run() {
-	try {
-		await client.connect();
-		console.log("✅ MongoDB connected successfully");
+  try {
+    await client.connect();
+    console.log("✅ MongoDB connected successfully");
 
-		const db = client.db(process.env.DB_NAME);
-		const usersCollection = db.collection("users");
-		const reportIncidentCollection = db.collection("reportIncidentColl");
-		const helpDeskCollection = db.collection("helpDeskColl");
+    const db = client.db(process.env.DB_NAME);
+    const usersCollection = db.collection("users");
+    const reportIncidentCollection = db.collection("reportIncidentColl");
+    const helpDeskCollection = db.collection("helpDeskColl");
 
-		// ----------------- AUTH ROUTES -----------------
-		const createAuthRoutes = require("./routes/authRoutes");
-		app.use("/auth", createAuthRoutes(usersCollection));
-		/* ================= HELP DESK ================= */
-		const createHelpDeskRoutes = require("./routes/helpDeskRoutes");
-		app.use("/api", createHelpDeskRoutes(helpDeskCollection));
+    // ----------------- AUTH ROUTES -----------------
+    const createAuthRoutes = require("./routes/authRoutes");
+    app.use("/auth", createAuthRoutes(usersCollection));
+    /* ================= HELP DESK ================= */
+    const createHelpDeskRoutes = require("./routes/helpDeskRoutes");
+    app.use("/api", createHelpDeskRoutes(helpDeskCollection));
 
+    // ADMIN-----------------------------------		// ADMIN-----------------------------------
 
-		// ADMIN-----------------------------------		// ADMIN-----------------------------------
+    app.get("/admin-stats", async (req, res) => {
+      try {
+        const totalReports = await reportIncidentCollection.countDocuments();
 
-		app.get("/admin-stats", async (req, res) => {
-			try {
-				const totalReports = await reportIncidentCollection.countDocuments();
+        const pendingReview = await reportIncidentCollection.countDocuments({
+          status: "pending",
+        });
 
-				const pendingReview = await reportIncidentCollection.countDocuments({
-					status: "pending",
-				});
+        const casesResolved = await reportIncidentCollection.countDocuments({
+          status: "resolved",
+        });
 
-				const casesResolved = await reportIncidentCollection.countDocuments({
-					status: "resolved",
-				});
+        const rejectedCases = await reportIncidentCollection.countDocuments({
+          status: "rejected",
+        });
 
-				const rejectedCases = await reportIncidentCollection.countDocuments({
-					status: "rejected",
-				});
+        const criticalThreats = await reportIncidentCollection.countDocuments({
+          urgency: "high",
+        });
 
-				const criticalThreats = await reportIncidentCollection.countDocuments({
-					urgency: "high",
-				});
+        // Threat distribution (example by incidentType)
+        const distribution = await reportIncidentCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$incidentType",
+                value: { $sum: 1 },
+              },
+            },
+            {
+              $project: {
+                name: "$_id",
+                value: 1,
+                _id: 0,
+              },
+            },
+          ])
+          .toArray();
 
-				// Threat distribution (example by incidentType)
-				const distribution = await reportIncidentCollection.aggregate([
-					{
-						$group: {
-							_id: "$incidentType",
-							value: { $sum: 1 },
-						},
-					},
-					{
-						$project: {
-							name: "$_id",
-							value: 1,
-							_id: 0,
-						},
-					},
-				]).toArray();
+        res.send({
+          success: true,
+          summary: {
+            totalReports,
+            pendingReview,
+            casesResolved,
+            rejectedCases,
+            criticalThreats,
+          },
+          distribution,
+        });
+      } catch (err) {
+        res.status(500).send({
+          success: false,
+          message: err.message,
+        });
+      }
+    });
 
-				res.send({
-					success: true,
-					summary: {
-						totalReports,
-						pendingReview,
-						casesResolved,
-						rejectedCases,
-						criticalThreats,
-					},
-					distribution,
-				});
-			} catch (err) {
-				res.status(500).send({
-					success: false,
-					message: err.message,
-				});
-			}
-		});
+    // ADMIN-----------------------------------		// ADMIN-----------------------------------
 
+    // ----------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START -----------------
+    // ********* SEARCH REPORT *********
+    app.get("/report/:ticket", async (req, res) => {
+      try {
+        const ticket = req.params.ticket;
+        const result = await reportIncidentCollection.findOne({
+          ticketNumber: ticket,
+        });
+        if (result) {
+          res.send(result);
+        } else {
+          res.status(404).json({ message: "Ticket Not Found" });
+        }
+      } catch (error) {
+        res.status(500).json({ message: "Internal Server Problem" });
+      }
+    });
+    // CREATE USER
+    app.post("/users", async (req, res) => {
+      try {
+        const user = req.body;
 
+        if (!user.password || !user.email || !user.name) {
+          return res.status(400).send({
+            success: false,
+            message: "Name, email and password are required",
+          });
+        }
 
-		// ADMIN-----------------------------------		// ADMIN-----------------------------------
+        // Check if user already exists
+        const existingUser = await usersCollection.findOne({
+          email: user.email,
+        });
+        if (existingUser) {
+          return res
+            .status(400)
+            .send({ success: false, message: "User already exists" });
+        }
 
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
 
-		// ----------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START ---------------------------------- USERS-START -----------------
-		// ********* SEARCH REPORT *********
-		app.get("/report/:ticket", async (req, res) => {
-			try {
-				const ticket = req.params.ticket;
-				const result = await reportIncidentCollection.findOne({
-					ticketNumber: ticket,
-				});
-				if (result) {
-					res.send(result);
-				} else {
-					res.status(404).json({ message: "Ticket Not Found" });
-				}
-			} catch (error) {
-				res.status(500).json({ message: "Internal Server Problem" });
-			}
-		});
-		// CREATE USER
-		app.post("/users", async (req, res) => {
-			try {
-				const user = req.body;
+        user.role = user.role || "user";
+        user.email_verified = true;
 
-				if (!user.password || !user.email || !user.name) {
-					return res.status(400).send({
-						success: false,
-						message: "Name, email and password are required",
-					});
-				}
+        const result = await usersCollection.insertOne(user);
+        res.status(201).send({ success: true, data: result });
+      } catch (err) {
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
 
-				// Check if user already exists
-				const existingUser = await usersCollection.findOne({ email: user.email });
-				if (existingUser) {
-					return res
-						.status(400)
-						.send({ success: false, message: "User already exists" });
-				}
+    // GET USERS WITH SEARCH + PAGINATION
+    app.get("/users", async (req, res) => {
+      try {
+        const { q = "", page = 1, limit = 10 } = req.query;
 
-				const salt = await bcrypt.genSalt(10);
-				user.password = await bcrypt.hash(user.password, salt);
+        const pageNumber = parseInt(page);
+        const pageSize = parseInt(limit);
+        const skip = (pageNumber - 1) * pageSize;
 
-				user.role = user.role || "user";
-				user.email_verified = true;
+        // Search query
+        const query = q
+          ? {
+              $or: [
+                { name: { $regex: q, $options: "i" } },
+                { email: { $regex: q, $options: "i" } },
+                { phone: { $regex: q, $options: "i" } },
+              ],
+            }
+          : {};
 
-				const result = await usersCollection.insertOne(user);
-				res.status(201).send({ success: true, data: result });
-			} catch (err) {
-				res.status(500).send({ success: false, message: err.message });
-			}
-		});
+        const users = await usersCollection
+          .find(query)
+          .skip(skip)
+          .limit(pageSize)
+          .toArray();
 
-		// GET USERS WITH SEARCH + PAGINATION
-		app.get("/users", async (req, res) => {
-			try {
-				const { q = "", page = 1, limit = 10 } = req.query;
+        const totalUsers = await usersCollection.countDocuments(query);
+        const totalPages = Math.ceil(totalUsers / pageSize);
 
-				const pageNumber = parseInt(page);
-				const pageSize = parseInt(limit);
-				const skip = (pageNumber - 1) * pageSize;
+        res.send({
+          users,
+          totalUsers,
+          totalPages,
+          currentPage: pageNumber,
+        });
+      } catch (err) {
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
 
-				// Search query
-				const query = q
-					? {
-						$or: [
-							{ name: { $regex: q, $options: "i" } },
-							{ email: { $regex: q, $options: "i" } },
-							{ phone: { $regex: q, $options: "i" } },
-						],
-					}
-					: {};
+    // UPDATE USER (FINAL)
+    app.put("/users/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const updatedData = req.body;
 
-				const users = await usersCollection
-					.find(query)
-					.skip(skip)
-					.limit(pageSize)
-					.toArray();
+        const result = await usersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              name: updatedData.name,
+              email: updatedData.email,
+              phone: updatedData.phone,
+              role: updatedData.role,
+              status: updatedData.status,
+              division: updatedData.division,
+              district: updatedData.district,
+              upazila: updatedData.upazila,
+              updatedAt: new Date(),
+            },
+          },
+        );
 
-				const totalUsers = await usersCollection.countDocuments(query);
-				const totalPages = Math.ceil(totalUsers / pageSize);
+        res.send({ success: true, result });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
 
-				res.send({
-					users,
-					totalUsers,
-					totalPages,
-					currentPage: pageNumber,
-				});
-			} catch (err) {
-				res.status(500).send({ success: false, message: err.message });
-			}
-		});
+    //------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------
 
-		// UPDATE USER (FINAL)
-		app.put("/users/:id", async (req, res) => {
-			try {
-				const { id } = req.params;
-				const updatedData = req.body;
+    // ----------------CASES---------------------CASES--------------------CASES--------------------CASES
 
-				const result = await usersCollection.updateOne(
-					{ _id: new ObjectId(id) },
-					{
-						$set: {
-							name: updatedData.name,
-							email: updatedData.email,
-							phone: updatedData.phone,
-							role: updatedData.role,
-							status: updatedData.status,
-							division: updatedData.division,
-							district: updatedData.district,
-							upazila: updatedData.upazila,
-							updatedAt: new Date(),
-						},
-					}
-				);
+    // GET CASES WITH SEARCH + PAGINATION
+    app.get("/cases", async (req, res) => {
+      try {
+        const { q = "", page = 1, limit = 10 } = req.query;
 
-				res.send({ success: true, result });
-			} catch (err) {
-				console.error(err);
-				res.status(500).send({ success: false, message: err.message });
-			}
-		});
+        const pageNumber = parseInt(page);
+        const pageSize = parseInt(limit);
+        const skip = (pageNumber - 1) * pageSize;
 
-		//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------
+        const query = q
+          ? {
+              $or: [
+                { title: { $regex: q, $options: "i" } },
+                { "contactInfo.fullName": { $regex: q, $options: "i" } },
+                { incidentType: { $regex: q, $options: "i" } },
+              ],
+            }
+          : {};
 
-		// ----------------CASES---------------------CASES--------------------CASES--------------------CASES
+        const cases = await reportIncidentCollection
+          .find(query)
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(pageSize)
+          .toArray();
 
-		// GET CASES WITH SEARCH + PAGINATION
-		app.get("/cases", async (req, res) => {
-			try {
-				const { q = "", page = 1, limit = 10 } = req.query;
+        const totalCases = await reportIncidentCollection.countDocuments(query);
+        const totalPages = Math.ceil(totalCases / pageSize);
 
-				const pageNumber = parseInt(page);
-				const pageSize = parseInt(limit);
-				const skip = (pageNumber - 1) * pageSize;
+        res.send({
+          cases,
+          totalCases,
+          totalPages,
+          currentPage: pageNumber,
+        });
+      } catch (err) {
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
+    // GET SINGLE CASE DETAILS
+    app.get("/cases/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const singleCase = await reportIncidentCollection.findOne({
+          _id: new ObjectId(id),
+        });
 
-				const query = q
-					? {
-						$or: [
-							{ title: { $regex: q, $options: "i" } },
-							{ "contactInfo.fullName": { $regex: q, $options: "i" } },
-							{ incidentType: { $regex: q, $options: "i" } },
-						],
-					}
-					: {};
+        if (!singleCase) {
+          return res
+            .status(404)
+            .send({ success: false, message: "Case not found" });
+        }
 
-				const cases = await reportIncidentCollection
-					.find(query)
-					.sort({ _id: -1 })
-					.skip(skip)
-					.limit(pageSize)
-					.toArray();
+        res.send({ success: true, data: singleCase });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
 
-				const totalCases = await reportIncidentCollection.countDocuments(query);
-				const totalPages = Math.ceil(totalCases / pageSize);
+    // ----------------- UPDATE CASE STATUS -----------------
+    app.patch("/cases/:id/status", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
 
-				res.send({
-					cases,
-					totalCases,
-					totalPages,
-					currentPage: pageNumber,
-				});
-			} catch (err) {
-				res.status(500).send({ success: false, message: err.message });
-			}
-		});
-		// GET SINGLE CASE DETAILS
-		app.get("/cases/:id", async (req, res) => {
-			try {
-				const { id } = req.params;
-				const singleCase = await reportIncidentCollection.findOne({
-					_id: new ObjectId(id),
-				});
+        if (!["resolved", "rejected"].includes(status)) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid status" });
+        }
 
-				if (!singleCase) {
-					return res
-						.status(404)
-						.send({ success: false, message: "Case not found" });
-				}
+        const result = await reportIncidentCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status, updatedAt: new Date() } },
+        );
 
-				res.send({ success: true, data: singleCase });
-			} catch (err) {
-				console.error(err);
-				res.status(500).send({ success: false, message: err.message });
-			}
-		});
+        if (result.matchedCount === 0) {
+          return res
+            .status(404)
+            .send({ success: false, message: "Case not found" });
+        }
 
-		// ----------------- UPDATE CASE STATUS -----------------
-		app.patch("/cases/:id/status", async (req, res) => {
-			try {
-				const { id } = req.params;
-				const { status } = req.body;
+        res.send({ success: true, message: "Status updated successfully" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
 
-				if (!["resolved", "rejected"].includes(status)) {
-					return res
-						.status(400)
-						.send({ success: false, message: "Invalid status" });
-				}
+    // -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
 
-				const result = await reportIncidentCollection.updateOne(
-					{ _id: new ObjectId(id) },
-					{ $set: { status, updatedAt: new Date() } }
-				);
+    // PROFILE-------------------		// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
+    // UPDATE PROFILE WITH IMAGE
+    app.use("/uploads", express.static("uploads"));
 
-				if (result.matchedCount === 0) {
-					return res
-						.status(404)
-						.send({ success: false, message: "Case not found" });
-				}
+    app.locals.usersCollection = usersCollection;
 
-				res.send({ success: true, message: "Status updated successfully" });
-			} catch (err) {
-				console.error(err);
-				res.status(500).send({ success: false, message: err.message });
-			}
-		});
+    const profileRoutes = require("./routes/userProfileRoutes");
+    app.use(profileRoutes);
 
-		// -----------CASES-END------------CASES-END-----------------CASES-END--------------------CASES-END------------------CASES-END
+    // PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
 
-		// PROFILE-------------------		// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
-		// UPDATE PROFILE WITH IMAGE
-		app.use("/uploads", express.static("uploads"));
+    // ----------------- REPORT INCIDENT -----------------
+    app.post("/report-incident", async (req, res) => {
+      try {
+        const formData = req.body;
+        const ticketNumber = `RCPP-${Math.floor(
+          100000 + Math.random() * 900000,
+        )}`;
 
-		app.locals.usersCollection = usersCollection;
+        const newReport = {
+          ...formData,
+          ticketNumber: ticketNumber,
+          status: "pending",
+          submittedAt: new Date(),
+        };
 
-		const profileRoutes = require("./routes/userProfileRoutes");
-		app.use(profileRoutes);
+        const result = await reportIncidentCollection.insertOne(newReport);
 
-		// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------// PROFILE-------------------
-
-		// ----------------- REPORT INCIDENT -----------------
-		app.post("/report-incident", async (req, res) => {
-			try {
-				const formData = req.body;
-				const ticketNumber = `RCPP-${Math.floor(
-					100000 + Math.random() * 900000
-				)}`;
-
-				const newReport = {
-					...formData,
-					ticketNumber: ticketNumber,
-					status: "pending",
-					submittedAt: new Date(),
-				};
-
-				const result = await reportIncidentCollection.insertOne(newReport);
-
-				if (result.insertedId) {
-					res.status(201).json({
-						success: true,
-						message: "Report submitted successfully",
-						ticketNumber: ticketNumber,
-					});
-				} else {
-					res.status(500).json({
-						success: false,
-						message: "Failed to save report to database",
-					});
-				}
-			} catch (error) {
-				console.error("Submission Error:", error);
-				res.status(500).json({
-					success: false,
-					message: "Internal Server Error",
-				});
-			}
-		});
-		// ----------------- HELP DESK -----------------
-
-	} catch (err) {
-		console.error(err);
-	}
+        if (result.insertedId) {
+          res.status(201).json({
+            success: true,
+            message: "Report submitted successfully",
+            ticketNumber: ticketNumber,
+          });
+        } else {
+          res.status(500).json({
+            success: false,
+            message: "Failed to save report to database",
+          });
+        }
+      } catch (error) {
+        console.error("Submission Error:", error);
+        res.status(500).json({
+          success: false,
+          message: "Internal Server Error",
+        });
+      }
+    });
+    // ----------------- HELP DESK -----------------
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 run();
-
 
 // ----------------- ROOT -----------------
 app.get("/", (req, res) => res.send("RCPP main server is running"));
