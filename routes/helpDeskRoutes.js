@@ -120,7 +120,7 @@ ${description}
   router.patch("/contact-helpdesk/:id/read", async (req, res) => {
     await helpDeskCollection.updateOne(
       { _id: new ObjectId(req.params.id) },
-      { $set: { isRead: true } }
+      { $set: { isRead: true } },
     );
 
     res.send({ success: true });
