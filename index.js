@@ -54,7 +54,7 @@ async function run() {
     const usersCollection = db.collection("users");
     const reportIncidentCollection = db.collection("reportIncidentColl");
     const helpDeskCollection = db.collection("helpDeskColl");
-    helpDeskChatCollection = db.collection("helpDeskChat"); // chat collection assign
+    helpDeskChatCollection = db.collection("helpDeskChat"); // chat collection
     
     // ----------------- AUTH ROUTES -----------------
     const createAuthRoutes = require("./routes/authRoutes");
