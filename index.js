@@ -389,9 +389,6 @@ async function run() {
 				});
 			}
 		});
-
-
-    
 		// ----------------- HELP DESK -----------------
 
 	} catch (err) {
