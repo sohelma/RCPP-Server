@@ -50,7 +50,7 @@ const createHelpDeskRoutes = (helpDeskCollection) => {
       // 2️⃣ Send Mail (HTML + Text fallback)
       await transporter.sendMail({
         from: `"RCPP Help Desk" <${process.env.SMTP_USER}>`,
-        to: "support@rcpp.gov.bd",
+        to: "sohelma.us@gmail.com",
         replyTo: email,
         subject: `🆘 Help Desk Request | ${technicalSupport}`,
         text: `
