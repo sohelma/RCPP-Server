@@ -49,10 +49,16 @@ async function run() {
     await client.connect();
     console.log("✅ MongoDB connected successfully");
 
-		const db = client.db(process.env.DB_NAME);
-		const usersCollection = db.collection("users");
-		const reportIncidentCollection = db.collection("reportIncidentColl");
-		const helpDeskCollection = db.collection("helpDeskColl");
+    const db = client.db(process.env.DB_NAME);
+    const usersCollection = db.collection("users");
+    const reportIncidentCollection = db.collection("reportIncidentColl");
+    const helpDeskCollection = db.collection("helpDeskColl");
+    const newsCollection = db.collection("news");
+    const commentsCollection = db.collection("comments");
+
+    // =======News collection=======
+    const newsRoutes = require("./routes/news");
+    app.use("/api/news", newsRoutes(newsCollection, commentsCollection));
 
     // ----------------- AUTH ROUTES -----------------
     const createAuthRoutes = require("./routes/authRoutes");
@@ -245,7 +251,7 @@ async function run() {
       }
     });
 
-		//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------
+    //------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------
 
     // ----------------CASES---------------------CASES--------------------CASES--------------------CASES
 
