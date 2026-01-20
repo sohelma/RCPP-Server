@@ -53,6 +53,7 @@ async function run() {
 		const usersCollection = db.collection("users");
 		const reportIncidentCollection = db.collection("reportIncidentColl");
 		const helpDeskCollection = db.collection("helpDeskColl");
+    // const awarenessCollection = db.collection("awarenessContents");
 
 		// ----------------- AUTH ROUTES -----------------
 		const createAuthRoutes = require("./routes/authRoutes");
@@ -246,6 +247,38 @@ async function run() {
 		});
 
 		//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------//------------------------------------------------user-end----------------------------------
+// --------awerness-------------// --------awerness-------------// --------awerness-------------
+
+// awareness routes
+app.get("/api/awareness", async (req, res) => {
+  try {
+    // Example: awareness data থেকে calculate করা
+    const totalContents = await awarenessCollection.countDocuments();
+
+    const integrityScore = Math.min(100, 80 + totalContents);
+    const preventionRate = Math.min(100, 70 + totalContents * 0.5);
+
+    res.send({
+      success: true,
+      data: {
+        integrityScore,
+        preventionRate,
+        overallHealth:
+          integrityScore > 90 ? "Excellent" : "Good",
+      },
+    });
+  } catch (err) {
+    res.status(500).send({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+
+
+// --------awernessend-------------// --------awernessend-------------// --------awerness-------------
+
 
 		// ----------------CASES---------------------CASES--------------------CASES--------------------CASES
 
