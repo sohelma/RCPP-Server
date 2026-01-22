@@ -1,7 +1,6 @@
 # RCPP-Server
 
 
-
 Backend server for RCPP project using Node.js, Express, MongoDB,Firebase
 
 ## Project Overview
@@ -11,15 +10,10 @@ This is the backend repository for RCPP project. It includes:
 - Express server
 - Firebase for authentication
 
-## Team Members
-- **Sohel Mamun** – developer
-
 
 ## Branching Strategy
 - **main** → Production ready
-- **development** → Team integration/testing
-- **personal branches** → Each member has their own branch:
-  - `sohel`
+- **development** → integration/testing
 
 
 ## Getting Started
