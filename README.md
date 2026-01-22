@@ -11,22 +11,12 @@ This is the backend repository for RCPP project. It includes:
 - Express server
 - Firebase for authentication
 
-## Team Members
-- **Sohel Mamun** – developer
-- **Md. Shukur Mahmud (Sukkur)** –  developer
-- **Hafiz** –  developer
-- **Humayun** – developer
-- **Zilhaj** –  developer
+
 
 ## Branching Strategy
 - **main** → Production ready
 - **development** → Team integration/testing
-- **personal branches** → Each member has their own branch:
-  - `sohel`
-  - `sukkur`
-  - `hafiz`
-  - `humayun`
-  - `zilhaj`
+-
 
 ## Getting Started
 1. Clone the repo:
