@@ -315,6 +315,97 @@ async function run() {
       }
     });
 
+    // GET ASSIGNED CASES FOR USER
+// app.get("/users/:id/assigned-cases", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const cases = await reportIncidentCollection
+//       .find({ "assignedTo.userId": new ObjectId(id) })
+//       .sort({ assignedAt: -1 })
+//       .toArray();
+
+//     res.send({ success: true, data: cases });
+//   } catch (err) {
+//     res.status(500).send({ success: false, message: err.message });
+//   }
+// });
+// GET ASSIGNED CASES FOR USER
+app.get("/users/:id/assigned-cases", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const cases = await reportIncidentCollection
+      .find({ "assignedTo.id": new ObjectId(id) }) // 🔥 FIX HERE
+      .sort({ assignedAt: -1 })
+      .toArray();
+
+    res.send({ success: true, data: cases });
+  } catch (err) {
+    res.status(500).send({ success: false, message: err.message });
+  }
+});
+
+
+    // ASSIGN USER TO CASE
+app.post("/cases/:id/assign", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).send({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    const user = await usersCollection.findOne({
+      _id: new ObjectId(userId),
+    });
+
+    if (!user) {
+      return res.status(404).send({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const result = await reportIncidentCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          assignedTo: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+          },
+          assignedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({
+        success: false,
+        message: "Case not found",
+      });
+    }
+
+    res.send({
+      success: true,
+      message: "User assigned successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+
     // ----------------- UPDATE CASE STATUS -----------------
     app.patch("/cases/:id/status", async (req, res) => {
       try {

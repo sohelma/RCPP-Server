@@ -70,6 +70,33 @@ router.put(
   },
 );
 
+// routes/profile.js (বা cases route)
+
+router.get("/users/:id/assigned-reports", async (req, res) => {
+  try {
+    const casesCollection = req.app.locals.casesCollection;
+    const userId = req.params.id;
+
+    const reports = await casesCollection
+      .find({ assignedTo: new ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send({
+      success: true,
+      data: reports,
+    });
+  } catch (err) {
+    res.status(500).send({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+
+
+
 /* ---------- UPDATE PASSWORD ---------- */
 router.patch("/users/update-password/:id", async (req, res) => {
   try {
