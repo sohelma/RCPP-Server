@@ -4,7 +4,6 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const bcrypt = require("bcryptjs");
-// const { MongoClient, ServerApiVersion } = require("mongodb");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const app = express();
@@ -55,10 +54,19 @@ async function run() {
     const helpDeskCollection = db.collection("helpDeskColl");
     const newsCollection = db.collection("news");
     const commentsCollection = db.collection("comments");
+    const alertCollection = db.collection("threatAlerts");
+    const awarenessCollection = db.collection("awarenessContents");
 
     // =======News collection=======
     const newsRoutes = require("./routes/news");
     app.use("/api/news", newsRoutes(newsCollection, commentsCollection));
+
+    //====Awareness Section=====
+    const awarenessRoutes = require("./routes/awareness");
+    app.use(
+      "/api/awareness",
+      awarenessRoutes(awarenessCollection, alertCollection),
+    );
 
     // ----------------- AUTH ROUTES -----------------
     const createAuthRoutes = require("./routes/authRoutes");
@@ -316,95 +324,93 @@ async function run() {
     });
 
     // GET ASSIGNED CASES FOR USER
-// app.get("/users/:id/assigned-cases", async (req, res) => {
-//   try {
-//     const { id } = req.params;
+    // app.get("/users/:id/assigned-cases", async (req, res) => {
+    //   try {
+    //     const { id } = req.params;
 
-//     const cases = await reportIncidentCollection
-//       .find({ "assignedTo.userId": new ObjectId(id) })
-//       .sort({ assignedAt: -1 })
-//       .toArray();
+    //     const cases = await reportIncidentCollection
+    //       .find({ "assignedTo.userId": new ObjectId(id) })
+    //       .sort({ assignedAt: -1 })
+    //       .toArray();
 
-//     res.send({ success: true, data: cases });
-//   } catch (err) {
-//     res.status(500).send({ success: false, message: err.message });
-//   }
-// });
-// GET ASSIGNED CASES FOR USER
-app.get("/users/:id/assigned-cases", async (req, res) => {
-  try {
-    const { id } = req.params;
+    //     res.send({ success: true, data: cases });
+    //   } catch (err) {
+    //     res.status(500).send({ success: false, message: err.message });
+    //   }
+    // });
+    // GET ASSIGNED CASES FOR USER
+    app.get("/users/:id/assigned-cases", async (req, res) => {
+      try {
+        const { id } = req.params;
 
-    const cases = await reportIncidentCollection
-      .find({ "assignedTo.id": new ObjectId(id) }) // 🔥 FIX HERE
-      .sort({ assignedAt: -1 })
-      .toArray();
+        const cases = await reportIncidentCollection
+          .find({ "assignedTo.id": new ObjectId(id) }) // 🔥 FIX HERE
+          .sort({ assignedAt: -1 })
+          .toArray();
 
-    res.send({ success: true, data: cases });
-  } catch (err) {
-    res.status(500).send({ success: false, message: err.message });
-  }
-});
-
+        res.send({ success: true, data: cases });
+      } catch (err) {
+        res.status(500).send({ success: false, message: err.message });
+      }
+    });
 
     // ASSIGN USER TO CASE
-app.post("/cases/:id/assign", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { userId } = req.body;
+    app.post("/cases/:id/assign", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { userId } = req.body;
 
-    if (!userId) {
-      return res.status(400).send({
-        success: false,
-        message: "User ID is required",
-      });
-    }
+        if (!userId) {
+          return res.status(400).send({
+            success: false,
+            message: "User ID is required",
+          });
+        }
 
-    const user = await usersCollection.findOne({
-      _id: new ObjectId(userId),
-    });
+        const user = await usersCollection.findOne({
+          _id: new ObjectId(userId),
+        });
 
-    if (!user) {
-      return res.status(404).send({
-        success: false,
-        message: "User not found",
-      });
-    }
+        if (!user) {
+          return res.status(404).send({
+            success: false,
+            message: "User not found",
+          });
+        }
 
-    const result = await reportIncidentCollection.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          assignedTo: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
+        const result = await reportIncidentCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              assignedTo: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+              },
+              assignedAt: new Date(),
+            },
           },
-          assignedAt: new Date(),
-        },
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "Case not found",
+          });
+        }
+
+        res.send({
+          success: true,
+          message: "User assigned successfully",
+        });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({
+          success: false,
+          message: err.message,
+        });
       }
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).send({
-        success: false,
-        message: "Case not found",
-      });
-    }
-
-    res.send({
-      success: true,
-      message: "User assigned successfully",
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({
-      success: false,
-      message: err.message,
-    });
-  }
-});
-
 
     // ----------------- UPDATE CASE STATUS -----------------
     app.patch("/cases/:id/status", async (req, res) => {
