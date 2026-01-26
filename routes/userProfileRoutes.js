@@ -29,7 +29,7 @@ router.get("/users/:id", async (req, res) => {
 /* ---------- UPDATE PROFILE ---------- */
 router.put(
   "/users/profile/:id",
-  upload.single("profileImage"),
+  // upload.single("profileImage"),
   async (req, res) => {
     try {
       const usersCollection = req.app.locals.usersCollection;

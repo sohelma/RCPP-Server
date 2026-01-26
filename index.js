@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const multer = require("multer");
+
 const path = require("path");
 const bcrypt = require("bcryptjs");
 // const { MongoClient, ServerApiVersion } = require("mongodb");
@@ -16,10 +16,7 @@ app.use(express.json());
 app.use(cors());
 
 // ----------------- FILE UPLOAD -----------------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
-});
+
 
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /pdf|doc|jpg|jpeg|png|txt/;
@@ -27,11 +24,7 @@ const fileFilter = (req, file, cb) => {
   cb(null, allowedTypes.test(ext));
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
-});
+
 app.use("/uploads", express.static("uploads"));
 
 // ----------------- MONGODB -----------------
@@ -46,7 +39,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     console.log("✅ MongoDB connected successfully");
 
     const db = client.db(process.env.DB_NAME);
