@@ -50,7 +50,7 @@ const createAwarenessRoutes = (awarenessCollection, alertCollection) => {
         .send({ message: "Alert fetch error", error: error.message });
     }
   });
-
+  // details post
   router.get("/details/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -71,7 +71,7 @@ const createAwarenessRoutes = (awarenessCollection, alertCollection) => {
       res.status(500).send({ message: "Server Error" });
     }
   });
-
+  // Add post
   router.post("/add", async (req, res) => {
     try {
       const content = req.body;
@@ -84,6 +84,64 @@ const createAwarenessRoutes = (awarenessCollection, alertCollection) => {
       res.send(result);
     } catch (error) {
       res.status(500).send({ message: "Failed to add content" });
+    }
+  });
+
+  // Update post
+
+  router.patch("/update/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      if (!ObjectId.isValid(id))
+        return res.status(400).send({ success: false, message: "Invalid ID" });
+
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          ...req.body,
+          updatedAt: new Date(),
+        },
+      };
+
+      const result = await awarenessCollection.updateOne(query, updateDoc);
+
+      if (result.matchedCount === 1) {
+        res.status(200).send({
+          success: true,
+          message: "Updated successfully",
+          modifiedCount: result.modifiedCount,
+        });
+      } else {
+        res.status(404).send({ success: false, message: "Post not found" });
+      }
+    } catch (error) {
+      res.status(500).send({
+        success: false,
+        message: "Update error",
+        error: error.message,
+      });
+    }
+  });
+
+  // Detele Post
+  router.delete("/delete/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      const result = await awarenessCollection.deleteOne(query);
+
+      if (result.deletedCount === 1) {
+        res
+          .status(200)
+          .send({ success: true, message: "Deleted successfully" });
+      } else {
+        res
+          .status(404)
+          .send({ success: false, message: "No document found to delete" });
+      }
+    } catch (error) {
+      res.status(500).send({ message: "Delete error", error: error.message });
     }
   });
 

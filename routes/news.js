@@ -62,6 +62,20 @@ const newsRoutes = (newsCollection, commentsCollection) => {
       res.status(500).send({ success: false, message: err.message });
     }
   });
+  // News Update
+  router.patch("/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const updateData = req.body;
+      const result = await newsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updateData },
+      );
+      res.send({ success: true, modifiedCount: result.modifiedCount });
+    } catch (err) {
+      res.status(500).send({ success: false, message: err.message });
+    }
+  });
 
   // ==========================================
   // নতুন: কমেন্ট রাউটস (Comments Collection ব্যবহার করে)
