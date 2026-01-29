@@ -1,10 +1,10 @@
 {
   "name": "rcpp-server",
   "version": "1.0.0",
-  "description": "RCPP-Server\r │── package.json\r │── index.js   (বা server.js / app.js)\r │── .gitignore",
+  "description": "RCPP-Server",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
   "repository": {
     "type": "git",
@@ -25,10 +25,5 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.0.0",
     "nodemailer": "^7.0.12"
-  },
-  "scripts": {
-  "start": "node index.js",
-  "build": "echo 'No build step needed for Node server'"
-}
-
+  }
 }
