@@ -144,6 +144,26 @@ const createAwarenessRoutes = (awarenessCollection, alertCollection) => {
       res.status(500).send({ message: "Delete error", error: error.message });
     }
   });
+  // Like API for Awareness
+  router.patch("/like/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      if (!ObjectId.isValid(id)) return res.status(400).send("Invalid ID");
+
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = { $inc: { likes: 1 } };
+
+      const result = await awarenessCollection.updateOne(filter, updateDoc);
+
+      if (result.matchedCount === 0) {
+        return res.status(404).send({ message: "Content not found" });
+      }
+
+      res.send({ success: true, message: "Liked successfully", result });
+    } catch (error) {
+      res.status(500).send({ message: "Like error", error: error.message });
+    }
+  });
 
   return router;
 };
