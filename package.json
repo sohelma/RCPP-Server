@@ -4,7 +4,7 @@
   "description": "RCPP-Server",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node init && node index.js"
   },
   "repository": {
     "type": "git",
