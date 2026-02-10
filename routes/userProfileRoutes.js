@@ -72,7 +72,7 @@ router.put(
 
 // routes/profile.js (বা cases route)
 
-router.get("/users/:id/assigned-reports", async (req, res) => {
+router.get("/users/:id/assigned-cases", async (req, res) => {
   try {
     const casesCollection = req.app.locals.casesCollection;
     const userId = req.params.id;
